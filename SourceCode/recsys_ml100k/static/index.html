@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CineRec — MovieLens ml-100k</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg:#0c0c0f; --bg2:#13131a; --bg3:#1a1a24; --surface:#1e1e2e;
+  --surface2:#252538; --border:rgba(255,255,255,.07); --border2:rgba(255,255,255,.13);
+  --accent:#e8b04b; --accent2:#c8893a; --red:#e85d5d; --green:#5dbf8a;
+  --blue:#5d9be8; --text:#e8e8f0; --text2:#9999b0; --text3:#5a5a72;
+  --mono:'DM Mono',monospace; --serif:'Bebas Neue',cursive; --sans:'DM Sans',sans-serif;
+  --r:8px; --r2:14px;
+}
+html { scroll-behavior:smooth; }
+body { font-family:var(--sans); background:var(--bg); color:var(--text); min-height:100vh; overflow-x:hidden; }
+
+/* grain */
+body::before { content:''; position:fixed; inset:0;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E");
+  opacity:.025; pointer-events:none; z-index:9999; }
+
+/* header */
+header { position:sticky; top:0; z-index:100; background:rgba(12,12,15,.92);
+  backdrop-filter:blur(16px); border-bottom:1px solid var(--border);
+  padding:0 32px; height:64px; display:flex; align-items:center; justify-content:space-between; }
+.logo { font-family:var(--serif); font-size:28px; letter-spacing:3px; color:var(--accent); display:flex; align-items:center; gap:10px; }
+.logo-dot { width:8px; height:8px; background:var(--accent); border-radius:50%; animation:pulse 2s ease-in-out infinite; }
+@keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.4;transform:scale(.7)} }
+.hstats { display:flex; gap:24px; }
+.hs { text-align:center; font-size:11px; color:var(--text3); font-family:var(--mono); letter-spacing:.05em; }
+.hs strong { display:block; font-size:14px; color:var(--text2); font-weight:500; }
+
+/* hero */
+.hero { padding:56px 32px 40px; max-width:1200px; margin:0 auto; }
+.hero-label { font-family:var(--mono); font-size:11px; letter-spacing:.15em; color:var(--accent); text-transform:uppercase; margin-bottom:12px; }
+.hero h1 { font-family:var(--serif); font-size:clamp(44px,5.5vw,76px); line-height:.95; letter-spacing:2px; margin-bottom:14px; }
+.hero h1 span { color:var(--accent); }
+.hero p { color:var(--text2); font-size:15px; font-weight:300; max-width:520px; line-height:1.65; }
+
+/* layout */
+.layout { max-width:1200px; margin:0 auto; padding:0 32px 80px;
+  display:grid; grid-template-columns:340px 1fr; gap:22px; align-items:start; }
+
+/* panel */
+.panel { background:var(--surface); border:1px solid var(--border); border-radius:var(--r2); overflow:hidden; }
+.ph { padding:16px 20px 12px; border-bottom:1px solid var(--border); display:flex; align-items:center; gap:10px; }
+.ph-icon { width:26px; height:26px; background:var(--bg3); border-radius:6px; display:flex; align-items:center; justify-content:center; font-size:12px; }
+.ph-title { font-family:var(--mono); font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:var(--text2); }
+.pb { padding:18px 20px; }
+
+/* controls */
+.flabel { font-family:var(--mono); font-size:10px; letter-spacing:.1em; text-transform:uppercase; color:var(--text3); margin-bottom:7px; }
+input[type=number], select {
+  width:100%; background:var(--bg3); border:1px solid var(--border2); color:var(--text);
+  padding:10px 13px; border-radius:var(--r); font-family:var(--mono); font-size:13px;
+  outline:none; transition:border-color .15s; margin-bottom:14px; }
+input[type=number]:focus, select:focus { border-color:var(--accent); }
+select { cursor:pointer; appearance:none;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%235a5a72' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat:no-repeat; background-position:right 12px center; padding-right:36px; }
+
+.method-grid { display:grid; grid-template-columns:1fr 1fr 1fr; gap:6px; margin-bottom:14px; }
+.mbtn { padding:9px 4px; background:var(--bg3); border:1px solid var(--border); border-radius:var(--r);
+  color:var(--text2); font-family:var(--mono); font-size:11px; letter-spacing:.05em;
+  cursor:pointer; transition:all .15s; text-align:center; }
+.mbtn:hover { border-color:var(--border2); color:var(--text); }
+.mbtn.active { background:var(--accent); border-color:var(--accent); color:#000; font-weight:500; }
+
+.nrow { display:flex; align-items:center; gap:10px; margin-bottom:18px; }
+.nrow label { font-family:var(--mono); font-size:10px; color:var(--text3); text-transform:uppercase; letter-spacing:.1em; white-space:nowrap; }
+input[type=range] { flex:1; accent-color:var(--accent); cursor:pointer; }
+.nval { font-family:var(--mono); font-size:13px; color:var(--accent); min-width:22px; text-align:right; }
+
+.run-btn { width:100%; padding:13px; background:var(--accent); color:#000; border:none;
+  border-radius:var(--r); font-family:var(--serif); font-size:18px; letter-spacing:2px;
+  cursor:pointer; transition:background .15s, transform .1s; }
+.run-btn:hover { background:#f0bc55; }
+.run-btn:active { transform:scale(.98); }
+.run-btn:disabled { background:var(--surface2); color:var(--text3); cursor:not-allowed; transform:none; }
+
+.divider { height:1px; background:var(--border); margin:14px 0; }
+.chips { display:flex; flex-wrap:wrap; gap:5px; margin-top:12px; }
+.chip { padding:4px 10px; background:var(--bg3); border:1px solid var(--border); border-radius:99px;
+  font-family:var(--mono); font-size:11px; color:var(--text2); cursor:pointer; transition:all .12s; }
+.chip:hover { border-color:var(--accent); color:var(--accent); }
+
+/* metrics */
+.mgrid { display:grid; grid-template-columns:1fr 1fr 1fr; gap:7px; }
+.mc { background:var(--bg3); border-radius:var(--r); padding:10px 8px; text-align:center; border:1px solid var(--border); }
+.mc .val { font-family:var(--mono); font-size:15px; font-weight:500; color:var(--accent); }
+.mc .lbl { font-size:9px; letter-spacing:.1em; text-transform:uppercase; color:var(--text3); margin-top:2px; font-family:var(--mono); }
+.mc .mdl { font-size:9px; color:var(--text3); font-family:var(--mono); margin-top:2px; }
+
+/* precision/recall table */
+.prtable { width:100%; border-collapse:collapse; margin-top:12px; font-size:11px; }
+.prtable th { font-family:var(--mono); font-size:9px; letter-spacing:.08em; text-transform:uppercase;
+  color:var(--text3); padding:6px 8px; border-bottom:1px solid var(--border); text-align:left; }
+.prtable td { padding:6px 8px; font-family:var(--mono); font-size:11px; color:var(--text2); border-bottom:1px solid var(--border); }
+.prtable tr:last-child td { border-bottom:none; }
+.prtable .best { color:var(--accent); font-weight:500; }
+
+/* loss chart */
+#lossCanvas { width:100%; height:88px; display:block; margin-top:10px; }
+
+/* right */
+.right { display:flex; flex-direction:column; gap:20px; }
+
+/* placeholder */
+.empty { text-align:center; padding:56px 20px; color:var(--text3); }
+.empty-icon { font-size:38px; margin-bottom:12px; opacity:.35; }
+.empty h3 { font-family:var(--serif); font-size:20px; letter-spacing:1px; color:var(--text3); margin-bottom:6px; }
+.empty p { font-size:13px; font-weight:300; }
+
+/* rec grid */
+.rec-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(195px,1fr)); gap:12px; }
+.rcard { background:var(--bg3); border:1px solid var(--border); border-radius:var(--r2); padding:15px;
+  transition:border-color .15s, transform .15s; position:relative; overflow:hidden;
+  animation:fadeUp .35s ease both; }
+.rcard:hover { border-color:var(--border2); transform:translateY(-2px); }
+@keyframes fadeUp { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} }
+.rrank { font-family:var(--serif); font-size:34px; color:rgba(232,176,75,.07);
+  position:absolute; top:4px; right:10px; line-height:1; pointer-events:none; user-select:none; }
+.rtitle { font-size:13px; font-weight:500; line-height:1.35; margin-bottom:8px; padding-right:26px; }
+.rgenres { display:flex; flex-wrap:wrap; gap:3px; margin-bottom:10px; }
+.rgenre { font-size:9px; font-family:var(--mono); letter-spacing:.04em; text-transform:uppercase;
+  padding:2px 6px; border-radius:99px; background:var(--surface2); color:var(--text3); border:1px solid var(--border); }
+.rscore { display:flex; align-items:center; gap:6px; }
+.rscore-bar { flex:1; height:3px; background:var(--surface2); border-radius:2px; overflow:hidden; }
+.rscore-fill { height:100%; background:linear-gradient(90deg,var(--accent2),var(--accent)); border-radius:2px; transition:width .5s ease; }
+.rscore-val { font-family:var(--mono); font-size:11px; color:var(--accent); white-space:nowrap; }
+.rstars { color:var(--accent); font-size:10px; }
+
+/* results header */
+.rh { display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; }
+.rh-tag { font-family:var(--mono); font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:var(--text3); }
+.rh-badge { font-family:var(--mono); font-size:11px; padding:3px 10px; border-radius:99px;
+  background:rgba(232,176,75,.12); color:var(--accent); border:1px solid rgba(232,176,75,.25); }
+
+/* history */
+.hlist { display:flex; flex-direction:column; gap:7px; }
+.hitem { display:flex; align-items:center; gap:11px; padding:9px 12px;
+  background:var(--bg3); border:1px solid var(--border); border-radius:var(--r);
+  animation:fadeUp .3s ease both; }
+.hrating { width:30px; height:30px; border-radius:50%; display:flex; align-items:center; justify-content:center;
+  font-family:var(--mono); font-size:12px; font-weight:500; flex-shrink:0; }
+.r5{background:rgba(93,191,138,.15);color:var(--green)}
+.r4{background:rgba(93,191,138,.08);color:#7dd3a8}
+.r3{background:rgba(232,176,75,.1);color:var(--accent)}
+.r2{background:rgba(232,93,93,.08);color:#e88080}
+.r1{background:rgba(232,93,93,.15);color:var(--red)}
+.hinfo { flex:1; min-width:0; }
+.htitle { font-size:12px; font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.hgenres { font-size:10px; color:var(--text3); font-family:var(--mono); margin-top:2px; }
+
+/* loader */
+.loader { display:flex; align-items:center; justify-content:center; gap:8px; padding:48px; flex-direction:column; }
+.spin { width:30px; height:30px; border:2px solid var(--border2); border-top-color:var(--accent); border-radius:50%; animation:spin .7s linear infinite; }
+@keyframes spin { to{transform:rotate(360deg)} }
+.loader p { font-family:var(--mono); font-size:11px; color:var(--text3); letter-spacing:.08em; }
+
+/* toast */
+.toast { position:fixed; bottom:24px; right:24px; padding:11px 18px;
+  background:var(--surface2); border:1px solid var(--border2); border-radius:var(--r);
+  font-family:var(--mono); font-size:12px; color:var(--text); z-index:9999;
+  transform:translateY(60px); opacity:0; transition:all .25s ease; }
+.toast.show { transform:translateY(0); opacity:1; }
+.toast.err { border-color:rgba(232,93,93,.4); color:var(--red); }
+
+::-webkit-scrollbar{width:5px}
+::-webkit-scrollbar-track{background:var(--bg)}
+::-webkit-scrollbar-thumb{background:var(--surface2);border-radius:3px}
+
+@media(max-width:900px){.layout{grid-template-columns:1fr}.hstats{display:none}}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo"><div class="logo-dot"></div>CINEREC</div>
+  <div class="hstats" id="hstats">
+    <div class="hs"><strong id="hs-u">—</strong>USERS</div>
+    <div class="hs"><strong id="hs-m">—</strong>MOVIES</div>
+    <div class="hs"><strong id="hs-r">—</strong>RATINGS</div>
+    <div class="hs"><strong id="hs-rmse">—</strong>BEST RMSE</div>
+  </div>
+</header>
+
+<div class="hero">
+  <div class="hero-label">// Hệ Thống Gợi Ý · MovieLens ml-100k · Giai Đoạn 5</div>
+  <h1>GỢI Ý PHIM<br><span>THÔNG MINH</span></h1>
+  <p>Demo toàn hệ thống: User-based CF · Item-based CF · Matrix Factorization (Funk SVD)<br>943 người dùng · 1.682 phim · 100.000 ratings thực tế.</p>
+</div>
+
+<div class="layout">
+
+  <!-- LEFT -->
+  <div style="display:flex;flex-direction:column;gap:18px;position:sticky;top:76px">
+
+    <!-- Control -->
+    <div class="panel">
+      <div class="ph"><div class="ph-icon">⚙</div><div class="ph-title">Bảng Điều Khiển</div></div>
+      <div class="pb">
+        <div class="flabel">User ID (1 – 943)</div>
+        <input type="number" id="uid" min="1" max="943" value="1" placeholder="Nhập user ID...">
+
+        <div class="flabel">Phương pháp gợi ý</div>
+        <div class="method-grid">
+          <button class="mbtn" data-m="ubcf">User-CF</button>
+          <button class="mbtn" data-m="ibcf">Item-CF</button>
+          <button class="mbtn active" data-m="mf">MF (SVD)</button>
+        </div>
+
+        <div class="nrow">
+          <label>Số gợi ý</label>
+          <input type="range" id="nslider" min="5" max="20" value="10">
+          <div class="nval" id="nval">10</div>
+        </div>
+
+        <button class="run-btn" id="runBtn" onclick="go()">GET RECOMMENDATIONS</button>
+
+        <div class="divider"></div>
+        <div class="flabel">Chọn nhanh</div>
+        <div class="chips" id="chips"></div>
+      </div>
+    </div>
+
+    <!-- Metrics -->
+    <div class="panel">
+      <div class="ph"><div class="ph-icon">📊</div><div class="ph-title">Hiệu Suất Mô Hình</div></div>
+      <div class="pb">
+        <div class="mgrid" id="mgrid">
+          <div class="mc"><div class="val">…</div><div class="lbl">MAE</div><div class="mdl">User-CF</div></div>
+          <div class="mc"><div class="val">…</div><div class="lbl">MAE</div><div class="mdl">Item-CF</div></div>
+          <div class="mc"><div class="val">…</div><div class="lbl">MAE</div><div class="mdl">MF SVD</div></div>
+          <div class="mc"><div class="val">…</div><div class="lbl">RMSE</div><div class="mdl">User-CF</div></div>
+          <div class="mc"><div class="val">…</div><div class="lbl">RMSE</div><div class="mdl">Item-CF</div></div>
+          <div class="mc"><div class="val">…</div><div class="lbl">RMSE</div><div class="mdl">MF SVD</div></div>
+        </div>
+        <table class="prtable" id="prtable" style="display:none">
+          <thead><tr><th>Mô hình</th><th>Precision@10</th><th>Recall@10</th></tr></thead>
+          <tbody id="prtbody"></tbody>
+        </table>
+        <canvas id="lossCanvas"></canvas>
+        <div style="text-align:center;margin-top:5px;font-family:var(--mono);font-size:9px;color:var(--text3);letter-spacing:.1em;text-transform:uppercase">MF Train/Val Loss (30 epochs)</div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- RIGHT -->
+  <div class="right">
+    <div class="panel">
+      <div class="ph"><div class="ph-icon">🎬</div><div class="ph-title">Kết Quả Gợi Ý</div></div>
+      <div class="pb" id="recBox">
+        <div class="empty">
+          <div class="empty-icon">🎞</div>
+          <h3>CHƯA CÓ GỢI Ý</h3>
+          <p>Nhập User ID và nhấn nút để xem danh sách phim được gợi ý</p>
+        </div>
+      </div>
+    </div>
+    <div class="panel" id="histPanel" style="display:none">
+      <div class="ph"><div class="ph-icon">📽</div><div class="ph-title">Lịch Sử Xem Của User</div></div>
+      <div class="pb"><div class="hlist" id="hlist"></div></div>
+    </div>
+  </div>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+let method = 'mf';
+
+document.addEventListener('DOMContentLoaded', () => {
+  document.querySelectorAll('.mbtn').forEach(b => b.addEventListener('click', () => {
+    document.querySelectorAll('.mbtn').forEach(x => x.classList.remove('active'));
+    b.classList.add('active'); method = b.dataset.m;
+  }));
+  document.getElementById('nslider').addEventListener('input', e => {
+    document.getElementById('nval').textContent = e.target.value;
+  });
+  document.getElementById('uid').addEventListener('keydown', e => {
+    if (e.key === 'Enter') go();
+  });
+  loadStats();
+});
+
+async function loadStats() {
+  try {
+    const d = await fetch('/api/stats').then(r => r.json());
+    document.getElementById('hs-u').textContent  = d.n_users;
+    document.getElementById('hs-m').textContent  = d.n_movies;
+    document.getElementById('hs-r').textContent  = d.n_ratings.toLocaleString();
+    const best = Math.min(d.metrics.ubcf.rmse, d.metrics.ibcf.rmse, d.metrics.mf.rmse);
+    document.getElementById('hs-rmse').textContent = best.toFixed(4);
+
+    // Metric cards
+    const mg = document.getElementById('mgrid');
+    const m  = d.metrics;
+    const bestRmse = best;
+    mg.innerHTML = [
+      mc(m.ubcf.mae,  'MAE',  'User-CF'),
+      mc(m.ibcf.mae,  'MAE',  'Item-CF'),
+      mc(m.mf.mae,    'MAE',  'MF SVD', true),
+      mc(m.ubcf.rmse, 'RMSE', 'User-CF'),
+      mc(m.ibcf.rmse, 'RMSE', 'Item-CF'),
+      mc(m.mf.rmse,   'RMSE', 'MF SVD', true),
+    ].join('');
+
+    // Precision/Recall table
+    const tbody = document.getElementById('prtbody');
+    const pt    = document.getElementById('prtable');
+    const models = [['ubcf','User-CF'],['ibcf','Item-CF'],['mf','MF SVD']];
+    let prHtml = '';
+    for (const [k, label] of models) {
+      const p10 = m[k]['precision@10'] ?? '—';
+      const r10 = m[k]['recall@10']    ?? '—';
+      prHtml += `<tr><td>${label}</td><td class="${k==='mf'?'best':''}">${p10}</td><td class="${k==='mf'?'best':''}">${r10}</td></tr>`;
+    }
+    tbody.innerHTML = prHtml;
+    pt.style.display = 'table';
+
+    // Loss curve
+    drawLoss(d.mf_train_loss, d.mf_val_loss);
+
+    // User chips
+    const sample = [1,5,10,25,42,77,99,120,150,200,300,500];
+    document.getElementById('chips').innerHTML =
+      sample.map(u => `<div class="chip" onclick="quick(${u})">U${u}</div>`).join('');
+
+  } catch(e) {
+    toast('Không kết nối được server. Chạy: uvicorn app:app', true);
+  }
+}
+
+function mc(val, lbl, mdl, hi=false) {
+  return `<div class="mc" ${hi?'style="border-color:rgba(232,176,75,.3)"':''}>
+    <div class="val" ${hi?'style="color:var(--accent)"':''}>${val??'—'}</div>
+    <div class="lbl">${lbl}</div><div class="mdl">${mdl}</div></div>`;
+}
+
+function drawLoss(train, val) {
+  const canvas = document.getElementById('lossCanvas');
+  if (!train?.length) return;
+  const dpr = window.devicePixelRatio || 1;
+  const W = canvas.offsetWidth || 300, H = 88;
+  canvas.width = W*dpr; canvas.height = H*dpr;
+  canvas.style.width = W+'px'; canvas.style.height = H+'px';
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+  const pad = {t:10,r:10,b:20,l:36};
+  const cw = W-pad.l-pad.r, ch = H-pad.t-pad.b;
+  const allVals = [...train, ...(val||[])].filter(v=>!isNaN(v));
+  const mn = Math.min(...allVals)*0.98, mx = Math.max(...allVals)*1.02;
+  const xS = i => pad.l+(i/(train.length-1))*cw;
+  const yS = v => pad.t+ch-((v-mn)/(mx-mn))*ch;
+
+  // Grid
+  ctx.strokeStyle='rgba(255,255,255,.05)'; ctx.lineWidth=1;
+  [0,1,2,3].forEach(i => {
+    const y = pad.t+(ch/3)*i;
+    ctx.beginPath(); ctx.moveTo(pad.l,y); ctx.lineTo(pad.l+cw,y); ctx.stroke();
+  });
+  ctx.fillStyle='rgba(255,255,255,.22)'; ctx.font=`9px 'DM Mono',monospace`;
+  ctx.textAlign='right';
+  ctx.fillText(mx.toFixed(3), pad.l-4, pad.t+5);
+  ctx.fillText(mn.toFixed(3), pad.l-4, pad.t+ch+5);
+
+  // Train fill
+  const g1 = ctx.createLinearGradient(0,pad.t,0,pad.t+ch);
+  g1.addColorStop(0,'rgba(232,176,75,.2)'); g1.addColorStop(1,'rgba(232,176,75,0)');
+  ctx.fillStyle=g1;
+  ctx.beginPath(); ctx.moveTo(xS(0),yS(train[0]));
+  train.forEach((v,i)=>ctx.lineTo(xS(i),yS(v)));
+  ctx.lineTo(xS(train.length-1),pad.t+ch); ctx.lineTo(xS(0),pad.t+ch);
+  ctx.closePath(); ctx.fill();
+
+  // Train line
+  ctx.strokeStyle='#e8b04b'; ctx.lineWidth=2; ctx.lineJoin='round';
+  ctx.beginPath(); train.forEach((v,i)=>i?ctx.lineTo(xS(i),yS(v)):ctx.moveTo(xS(i),yS(v)));
+  ctx.stroke();
+
+  // Val line
+  if (val?.length) {
+    ctx.strokeStyle='#5d9be8'; ctx.lineWidth=1.5; ctx.setLineDash([4,3]);
+    ctx.beginPath(); val.forEach((v,i)=>i?ctx.lineTo(xS(i),yS(v)):ctx.moveTo(xS(i),yS(v)));
+    ctx.stroke(); ctx.setLineDash([]);
+  }
+
+  // Legend
+  ctx.fillStyle='#e8b04b'; ctx.fillRect(pad.l,H-12,12,3);
+  ctx.fillStyle='rgba(255,255,255,.4)'; ctx.textAlign='left'; ctx.font=`9px 'DM Mono',monospace`;
+  ctx.fillText('Train',pad.l+16,H-8);
+  if (val?.length) {
+    ctx.fillStyle='#5d9be8'; ctx.fillRect(pad.l+65,H-12,12,3);
+    ctx.fillStyle='rgba(255,255,255,.4)'; ctx.fillText('Val',pad.l+81,H-8);
+  }
+}
+
+async function go() {
+  const uid = parseInt(document.getElementById('uid').value);
+  const n   = parseInt(document.getElementById('nslider').value);
+  if (!uid||uid<1||uid>943) { toast('User ID phải từ 1 đến 943', true); return; }
+
+  const btn = document.getElementById('runBtn');
+  btn.disabled=true; btn.textContent='LOADING...';
+  document.getElementById('recBox').innerHTML=`<div class="loader"><div class="spin"></div><p>Đang tính toán gợi ý...</p></div>`;
+
+  try {
+    const res = await fetch(`/api/recommend/${uid}?method=${method}&n=${n}`);
+    if (!res.ok) { const e=await res.json(); throw new Error(e.detail||'Lỗi'); }
+    const data = await res.json();
+    renderRecs(data);
+    renderHist(data.history);
+    toast(`✓ ${data.recommendations.length} gợi ý cho User ${uid} · ${method.toUpperCase()}`);
+  } catch(e) {
+    document.getElementById('recBox').innerHTML=`<div class="empty"><div class="empty-icon" style="color:var(--red)">⚠</div><h3 style="color:var(--red)">LỖI</h3><p>${e.message}</p></div>`;
+    toast(e.message, true);
+  } finally {
+    btn.disabled=false; btn.textContent='GET RECOMMENDATIONS';
+  }
+}
+
+function renderRecs(data) {
+  const {user_id, method: m, recommendations: recs} = data;
+  const mLabel = {ubcf:'User-based CF',ibcf:'Item-based CF',mf:'Matrix Factorization (SVD)'}[m];
+  let html = `<div class="rh"><div class="rh-tag">User #${user_id} · ${mLabel}</div><div class="rh-badge">${recs.length} phim</div></div><div class="rec-grid">`;
+  recs.forEach((r,i) => {
+    const gs  = (r.genres||'').split('|').slice(0,3);
+    const pct = ((r.predicted_rating-1)/4*100).toFixed(0);
+    const s   = Math.round(r.predicted_rating);
+    const stars = '★'.repeat(s)+'☆'.repeat(5-s);
+    html += `<div class="rcard" style="animation-delay:${i*.04}s">
+      <div class="rrank">${i+1}</div>
+      <div class="rtitle">${r.title}</div>
+      <div class="rgenres">${gs.map(g=>`<span class="rgenre">${g}</span>`).join('')}</div>
+      <div class="rscore">
+        <div class="rscore-bar"><div class="rscore-fill" style="width:${pct}%"></div></div>
+        <div class="rscore-val">${r.predicted_rating.toFixed(2)} <span class="rstars">${stars}</span></div>
+      </div></div>`;
+  });
+  html += '</div>';
+  document.getElementById('recBox').innerHTML = html;
+}
+
+function renderHist(history) {
+  const panel = document.getElementById('histPanel');
+  const list  = document.getElementById('hlist');
+  if (!history?.length) { panel.style.display='none'; return; }
+  panel.style.display='block';
+  list.innerHTML = history.map((h,i) => {
+    const gs = (h.genres||'').split('|').slice(0,2).join(' · ');
+    return `<div class="hitem" style="animation-delay:${i*.05}s">
+      <div class="hrating r${h.rating}">${h.rating}</div>
+      <div class="hinfo"><div class="htitle">${h.title}</div><div class="hgenres">${gs}</div></div>
+    </div>`;
+  }).join('');
+}
+
+function quick(uid) {
+  document.getElementById('uid').value = uid;
+  go();
+}
+
+let toastTmr;
+function toast(msg, err=false) {
+  const el = document.getElementById('toast');
+  el.textContent=msg; el.className='toast show'+(err?' err':'');
+  clearTimeout(toastTmr);
+  toastTmr=setTimeout(()=>el.className='toast',3200);
+}
+</script>
+</body>
+</html>
