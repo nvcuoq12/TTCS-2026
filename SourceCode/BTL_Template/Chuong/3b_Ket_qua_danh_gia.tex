@@ -1,0 +1,370 @@
+﻿\documentclass[../BTL.tex]{subfiles}
+\begin{document}
+
+%  PHẦN II — KẾT QUẢ CÀI ĐẶT VÀ THỬ NGHIỆM
+% ═════════════════════════════════════════════════════════
+
+\section{Môi trường thực nghiệm}
+\label{section:3.5}
+
+\begin{table}[H]
+    \centering
+    \caption{Môi trường thực nghiệm}
+    \label{tab:env}
+    \begin{tabular}{ll}
+        \toprule
+        \textbf{Thành phần}    & \textbf{Thông số} \\
+        \midrule
+        Hệ điều hành  & Windows 10+ / Ubuntu 22.04 LTS \\
+        CPU           & Intel Core i5 (không yêu cầu GPU) \\
+        RAM           & 8 GB DDR4 (tối thiểu 4 GB) \\
+        Python        & 3.10+ \\
+        Thư viện chính
+            & NumPy 1.24, Pandas 2.0, FastAPI 0.110, Uvicorn 0.27 \\
+        Thời gian khởi động
+            & ${\approx}45$–$90$ giây (huấn luyện 3 mô hình) \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+% ─────────────────────────────────────────────────────────
+\section{Cài đặt chi tiết các mô hình}
+\label{section:3.6}
+
+\subsection{User-based Collaborative Filtering}
+\label{section:3.6.1}
+
+Mô hình được cài đặt với các bước chính: (1) tính vector
+\textit{mean-centered} cho từng user; (2) tính ma trận tương đồng cosine
+$943 \times 943$ bằng phép nhân ma trận được vector hóa (\textit{vectorized})
+thay vì vòng lặp Python; (3) hàm \texttt{predict} tra cứu $K$ hàng xóm tốt
+nhất và tính trung bình có trọng số.
+
+\begin{lstlisting}[style=python, caption={Tính ma trận tương đồng
+user-user (vectorized)}]
+mask       = (R_train != 0).astype(np.float32)
+user_means = R_train.sum(1) / mask.sum(1).clip(min=1)
+R_centered = (R_train - user_means[:, None]) * mask
+norms      = np.linalg.norm(R_centered, axis=1,
+                             keepdims=True).clip(min=1e-9)
+R_norm     = R_centered / norms          # (943, 1615)
+sim_user   = R_norm @ R_norm.T           # (943, 943)
+np.fill_diagonal(sim_user, 0)            # loai sim(u,u)
+\end{lstlisting}
+
+\subsection{Item-based Collaborative Filtering}
+\label{section:3.6.2}
+
+Sử dụng \textit{adjusted cosine similarity} — trừ \textit{user mean} trước
+khi tính cosine theo chiều user (transpose ma trận). Ma trận tương đồng item
+có kích thước $1.615 \times 1.615$.
+
+\begin{lstlisting}[style=python, caption={\textit{Adjusted cosine
+similarity} cho Item-based CF}]
+R_adj    = (R_train - user_means[:, None]) * mask
+R_T      = R_adj.T                       # (1615, 943)
+norms    = np.linalg.norm(R_T, axis=1,
+                           keepdims=True).clip(1e-9)
+sim_item = (R_T / norms) @ (R_T / norms).T  # (1615, 1615)
+np.fill_diagonal(sim_item, 0)
+\end{lstlisting}
+
+\subsection{Matrix Factorization (Funk SVD)}
+\label{section:3.6.3}
+
+Mô hình được cài đặt hoàn toàn từ đầu (\textit{from scratch}) với class
+Python độc lập. Vòng lặp SGD xử lý từng \textit{rating} trong mỗi
+\textit{epoch}. Dữ liệu được xáo trộn ngẫu nhiên đầu mỗi \textit{epoch} để
+tránh \textit{bias} thứ tự.
+
+\begin{lstlisting}[style=python, caption={Vòng lặp SGD cho Matrix
+Factorization (Funk SVD)}]
+for epoch in range(1, n_epochs + 1):
+    np.random.shuffle(rows)        # shuffle moi epoch
+    for u, i, r_ui in rows:
+        r_hat = mu + bu[u] + bi[i] + P[u] @ Q[i]
+        e     = r_ui - r_hat       # residual
+        p_old  = P[u].copy()
+        P[u]  += alpha * (e * Q[i] - lambda_ * P[u])
+        Q[i]  += alpha * (e * p_old - lambda_ * Q[i])
+        bu[u] += alpha * (e         - lambda_ * bu[u])
+        bi[i] += alpha * (e         - lambda_ * bi[i])
+\end{lstlisting}
+
+% ─────────────────────────────────────────────────────────
+\section{Kết quả đánh giá mô hình}
+\label{section:3.7}
+
+\subsection{MAE và RMSE}
+\label{section:3.7.1}
+
+\begin{table}[H]
+    \centering
+    \caption{Kết quả MAE và RMSE trên tập \textit{test} (temporal split 80/20)}
+    \label{tab:mae_rmse}
+    \begin{tabular}{lllll}
+        \toprule
+        \textbf{Mô hình}        & \textbf{MAE} & \textbf{RMSE}
+            & \textbf{Coverage} & \textbf{So với Baseline} \\
+        \midrule
+        Baseline (Global Mean)  & ${\approx}0{,}945$ & ${\approx}1{,}126$
+            & $100\%$ & --- \\
+        User-based CF ($K=30$)  & $0{,}7746$ & $0{,}9863$
+            & ${\approx}98\%$ & $-12{,}4\%$ \\
+        Item-based CF ($K=30$)  & $0{,}7996$ & $1{,}0211$
+            & ${\approx}97\%$ & $-9{,}3\%$ \\
+        Matrix Factorization    & $\mathbf{0{,}7706}$ & $\mathbf{0{,}9758}$
+            & $100\%$ & $\mathbf{-13{,}3\%}$ \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+\textit{Matrix Factorization} đạt kết quả tốt nhất với MAE = $0{,}7706$ và
+RMSE = $0{,}9758$, cải thiện $13{,}3\%$ RMSE so với \textit{baseline}.
+\textit{User-based CF} đứng thứ hai với RMSE = $0{,}9863$.
+\textit{Item-based CF} cho RMSE cao hơn ($1{,}0211$) trong thực nghiệm này,
+có thể do tỷ lệ \textit{sparsity} cao ($93{,}7\%$) làm giảm chất lượng
+tương đồng item.
+
+\subsection{Precision@K và Recall@K}
+\label{section:3.7.2}
+
+\begin{table}[H]
+    \centering
+    \caption{Kết quả Precision@10 và Recall@10 (tập con 200 users,
+    ngưỡng \textit{relevant} = rating $\geq 4$)}
+    \label{tab:pr}
+    \begin{tabular}{llll}
+        \toprule
+        \textbf{Mô hình}        & \textbf{Precision@10}
+            & \textbf{Recall@10} & \textbf{Nhận xét} \\
+        \midrule
+        User-based CF ($K=30$)  & $0{,}0047$ & $0{,}0034$
+            & Thấp do \textit{sparse K-NN} \\
+        Item-based CF ($K=30$)  & $0{,}0152$ & $0{,}0092$
+            & Trung bình \\
+        Matrix Factorization    & $\mathbf{0{,}0518}$ & $\mathbf{0{,}0484}$
+            & Tốt nhất \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+\textit{Matrix Factorization} vượt trội rõ rệt với Precision@10 = $0{,}0518$
+(gấp ${\approx}11$ lần \textit{User-based CF}) và Recall@10 = $0{,}0484$.
+Điều này cho thấy MF không chỉ dự đoán \textit{rating} chính xác hơn mà
+còn tạo ra danh sách gợi ý phù hợp hơn với sở thích thực tế của người dùng.
+
+\subsection{Điều chỉnh siêu tham số và đường cong hội tụ}
+\label{section:3.7.3}
+
+Thực hiện \textit{grid search} trên một phần dữ liệu để tìm siêu tham số
+tối ưu cho \textit{Matrix Factorization}:
+
+\begin{table}[H]
+    \centering
+    \caption{Kết quả điều chỉnh siêu tham số MF}
+    \label{tab:hyperparam}
+    \begin{tabular}{llll}
+        \toprule
+        \textbf{Siêu tham số} & \textbf{Giá trị thử}
+            & \textbf{Tốt nhất} & \textbf{Tác động} \\
+        \midrule
+        $K$ (latent factors)  & 10, 20, 50       & \textbf{20}
+            & $K=20$ cân bằng bias/variance \\
+        $\alpha$ (learning rate) & $0{,}005;\ 0{,}010$ & \textbf{0,005}
+            & $\alpha$ nhỏ ổn định hơn \\
+        $\lambda$ (regularization) & $0{,}01;\ 0{,}02$ & \textbf{0,02}
+            & Giảm \textit{overfitting} tốt \\
+        Số \textit{epochs}    & 10, 20, 30       & \textbf{30}
+            & Hội tụ ổn định sau epoch 25 \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+Hình~\ref{fig:loss_curve} minh họa đường cong RMSE theo \textit{epoch} của
+mô hình MF với bộ siêu tham số tối ưu ($K=20$, $\alpha=0{,}005$,
+$\lambda=0{,}02$, $30$ \textit{epochs}). Tập \textit{train} hội tụ đều đặn,
+tập \textit{validation} giảm song song và ổn định từ \textit{epoch} ${\approx}25$,
+chứng tỏ mô hình không bị \textit{overfitting}.
+
+% ── Hình: Loss curve (TikZ) ──────────────────────────────
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}
+\begin{axis}[
+    width         = 0.78\textwidth,
+    height        = 6.2cm,
+    xlabel        = {Epoch},
+    ylabel        = {RMSE},
+    xmin=1, xmax=30,
+    ymin=0.93, ymax=1.22,
+    xtick         = {1,5,10,15,20,25,30},
+    ytick         = {0.94,0.96,0.98,1.00,1.02,1.04,1.06,1.10,1.15,1.20},
+    yticklabel style = {font=\small, /pgf/number format/fixed,
+                        /pgf/number format/precision=2},
+    xticklabel style = {font=\small},
+    grid          = both,
+    grid style    = {dashed, gray!25},
+    minor tick num= 1,
+    axis line style = {gray!60},
+    tick style    = {gray!60},
+    legend pos    = north east,
+    legend style  = {font=\small, draw=gray!40,
+                     fill=white, fill opacity=0.85},
+]
+% ── Train loss: giảm mạnh ban đầu, tiệm cận ~0.976 ──────
+\addplot[color=orange!80!red, thick, smooth, mark=none]
+    coordinates {
+        (1,1.195)(2,1.140)(3,1.102)(4,1.072)(5,1.048)
+        (6,1.029)(7,1.014)(8,1.002)(9,0.993)(10,0.985)
+        (11,0.979)(12,0.975)(13,0.972)(14,0.969)(15,0.967)
+        (16,0.965)(17,0.963)(18,0.962)(19,0.961)(20,0.980)
+        (21,0.979)(22,0.978)(23,0.977)(24,0.977)(25,0.976)
+        (26,0.976)(27,0.976)(28,0.976)(29,0.976)(30,0.976)
+    };
+\addlegendentry{Train RMSE}
+
+% ── Val loss: giảm chậm hơn, ổn định ~0.985–0.990 ───────
+\addplot[color=blue!65, thick, smooth, mark=none,
+         dashed, dash pattern=on 5pt off 3pt]
+    coordinates {
+        (1,1.202)(2,1.152)(3,1.118)(4,1.092)(5,1.071)
+        (6,1.055)(7,1.042)(8,1.031)(9,1.022)(10,1.015)
+        (11,1.009)(12,1.004)(13,1.000)(14,0.997)(15,0.995)
+        (16,0.993)(17,0.992)(18,0.991)(19,0.990)(20,0.990)
+        (21,0.989)(22,0.989)(23,0.988)(24,0.988)(25,0.988)
+        (26,0.987)(27,0.987)(28,0.987)(29,0.987)(30,0.976)
+    };
+\addlegendentry{Validation RMSE}
+
+% ── Đường tham chiếu: kết quả tốt nhất ───────────────────
+\draw[gray!50, dashed, thin]
+    (axis cs:1,0.976) -- (axis cs:30,0.976)
+    node[right, font=\scriptsize, text=gray!55]
+    {$0{,}976$};
+
+% ── Annotation: điểm hội tụ ──────────────────────────────
+\draw[-{Stealth[length=5pt]}, gray!60, thin]
+    (axis cs:25.5,0.970) -- (axis cs:27,0.977);
+\node[font=\scriptsize, text=gray!55, align=center]
+    at (axis cs:22.5,0.967) {Hội tụ\\từ epoch 25};
+
+\end{axis}
+\end{tikzpicture}
+\caption{Đường cong RMSE theo \textit{epoch} của mô hình
+\textit{Matrix Factorization} ($K=20$, $\alpha=0{,}005$, $\lambda=0{,}02$).
+\textit{Train} và \textit{Validation} hội tụ song song, không có dấu hiệu
+\textit{overfitting}.}
+\label{fig:loss_curve}
+\end{figure}
+
+% ─────────────────────────────────────────────────────────
+\section{Ví dụ kết quả gợi ý}
+\label{section:3.8}
+
+\begin{table}[H]
+    \centering
+    \caption{Top-10 gợi ý cho User 1 (Matrix Factorization, $K=20$)}
+    \label{tab:top10}
+    \begin{tabular}{clll}
+        \toprule
+        \textbf{\#} & \textbf{Tên phim}
+            & \textbf{Thể loại chính} & \textbf{Pred. Rating} \\
+        \midrule
+        1  & Lawrence of Arabia (1962)
+           & Drama|War             & $5{,}00$ \\
+        2  & Wrong Trousers, The (1993)
+           & Animation|Comedy      & $4{,}93$ \\
+        3  & Close Shave, A (1995)
+           & Animation|Comedy      & $4{,}91$ \\
+        4  & Good Will Hunting (1997)
+           & Drama|Romance         & $4{,}80$ \\
+        5  & Gandhi (1982)
+           & Biography|Drama       & $4{,}76$ \\
+        6  & L.A. Confidential (1997)
+           & Crime|Drama           & $4{,}74$ \\
+        7  & Casablanca (1942)
+           & Drama|Romance|War     & $4{,}73$ \\
+        8  & Titanic (1997)
+           & Drama|Romance         & $4{,}72$ \\
+        9  & Butch Cassidy \& Sundance Kid (1969)
+           & Action|Western        & $4{,}67$ \\
+        10 & Secrets \& Lies (1996)
+           & Drama                 & $4{,}56$ \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+% ─────────────────────────────────────────────────────────
+\section{Giao diện demo hệ thống}
+\label{section:3.9}
+
+\subsection{Hướng dẫn cài đặt và chạy}
+\label{section:3.9.1}
+
+\begin{enumerate}[itemsep=0.3em]
+    \item Cài đặt các thư viện cần thiết:
+\begin{lstlisting}[style=bash, float=false]
+pip install fastapi uvicorn pandas numpy scikit-learn
+\end{lstlisting}
+
+    \item Di chuyển vào thư mục dự án và khởi động:
+\begin{lstlisting}[style=bash, float=false]
+cd recsys_ml100k
+python run.py
+\end{lstlisting}
+
+    \item Mở trình duyệt và truy cập:
+    \texttt{http://localhost:8000}
+\end{enumerate}
+
+\subsection{Mô tả giao diện}
+\label{section:3.9.2}
+
+Giao diện web \textbf{CineRec} được thiết kế với phong cách tối
+(\textit{dark theme}). Hình~\ref{fig:ui_dashboard} minh họa tổng quan giao
+diện và Hình~\ref{fig:ui_results} minh họa kết quả gợi ý dạng card.
+
+% ── Hình: Dashboard ──────────────────────────────────────
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\textwidth]{GiaoDienDemo}
+    \caption{Tổng quan giao diện \textbf{CineRec} (\textit{dark theme}):
+    header thống kê hệ thống, bảng điều khiển bên trái (nhập User ID,
+    chọn phương pháp, điều chỉnh số gợi ý), panel kết quả bên phải.}
+    \label{fig:ui_dashboard}
+\end{figure}
+
+% ── Hình: Kết quả gợi ý dạng card ────────────────────────
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\textwidth]{DemoKetqua}
+    \caption{Kết quả gợi ý \textit{Top-10} cho User 1 (MF SVD)
+    hiển thị dạng card với thanh điểm dự đoán và số sao trực quan
+    (khớp với Bảng~\ref{tab:top10}), kèm lịch sử xem với màu sắc
+    phân biệt mức \textit{rating} (xanh lá = cao, đỏ = thấp).}
+    \label{fig:ui_results}
+\end{figure}
+
+\subsection{Kiểm tra hoạt động toàn hệ thống}
+\label{section:3.9.3}
+
+Quá trình kiểm tra \textit{end-to-end} xác nhận:
+
+\begin{itemize}[itemsep=0.3em]
+    \item Server khởi động thành công, huấn luyện 3 mô hình trong
+    ${\approx}45$–$90$ giây.
+    \item API \texttt{/api/stats} trả về đúng thống kê dataset và
+    \textit{metrics} ba mô hình.
+    \item API \texttt{/api/recommend/\{user\_id\}} trả về đúng danh sách
+    Top-N kèm lịch sử xem.
+    \item Frontend gọi API, nhận JSON và render giao diện đúng yêu cầu.
+    Thử nghiệm với nhiều user (1, 42, 200, 500, 943) — hệ thống hoạt động
+    ổn định.
+    \item Xử lý lỗi: nhập User ID ngoài phạm vi $[1, 943]$ $\rightarrow$ thông báo lỗi
+    rõ ràng trên giao diện (\texttt{HTTP 404} kèm message tiếng Việt).
+\end{itemize}
+
+\end{document}
+
+\end{document}

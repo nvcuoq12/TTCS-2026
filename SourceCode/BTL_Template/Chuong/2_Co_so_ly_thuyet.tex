@@ -1,0 +1,385 @@
+\documentclass[../BTL.tex]{subfiles}
+\begin{document}
+
+% ─────────────────────────────────────────────────────────
+\section{Tổng quan về Hệ thống Gợi ý}
+\label{section:2.1}
+
+\subsection{Định nghĩa}
+\label{section:2.1.1}
+
+Hệ thống gợi ý (\textit{Recommender System} hoặc \textit{Recommendation System}) là
+một dạng hệ thống lọc thông tin có nhiệm vụ dự đoán xếp hạng (\textit{rating}) hoặc
+sở thích mà một người dùng cụ thể sẽ dành cho một mục (\textit{item}) nhất định, từ
+đó đưa ra các gợi ý phù hợp nhất. Khái niệm này được hình thành từ những năm 1990
+với hệ thống lọc cộng tác GroupLens~\cite{resnick1994grouplens}, và kể từ đó đã trở
+thành một lĩnh vực nghiên cứu sôi động trong cộng đồng học máy và khai phá dữ liệu.
+
+\subsection{Phân loại}
+\label{section:2.1.2}
+
+Dựa trên phương pháp tiếp cận, hệ thống gợi ý được chia thành ba nhóm
+chính~\cite{ricci2011recommender}:
+
+\begin{itemize}[itemsep=0.4em]
+    \item \textbf{Content-based Filtering} (Lọc theo nội dung): Gợi ý các mục có
+    nội dung/đặc trưng tương tự với những mục người dùng đã thích trong quá khứ.
+    Ưu điểm: không cần dữ liệu từ người dùng khác. Nhược điểm: bị giới hạn trong
+    vùng nội dung quen thuộc (\textit{over-specialization}). Phương pháp này
+    không được sử dụng trong đồ án.
+
+    \item \textbf{Collaborative Filtering} (Lọc cộng tác): Gợi ý dựa trên
+    hành vi/đánh giá của cộng đồng người dùng. Không cần biết nội dung sản phẩm,
+    chỉ cần ma trận tương tác \textit{user-item}. Đây là phương pháp được sử dụng
+    chủ yếu trong đồ án này.
+
+    \item \textbf{Hybrid Approach} (Kết hợp): Kết hợp cả hai phương pháp trên để
+    tận dụng ưu điểm và khắc phục nhược điểm của từng loại. Được ứng dụng bởi các
+    hệ thống lớn như Netflix, YouTube.
+\end{itemize}
+
+% ─────────────────────────────────────────────────────────
+\section{Collaborative Filtering}
+\label{section:2.2}
+
+\subsection{Nguyên lý hoạt động}
+\label{section:2.2.1}
+
+\textit{Collaborative Filtering} (CF) dựa trên giả định cơ bản: những người dùng có
+hành vi tương tự trong quá khứ sẽ có sở thích tương tự trong tương
+lai~\cite{sarwar2001item}. CF khai thác ma trận tương tác \textit{user-item} $R$
+(kích thước $n \times m$) trong đó $R[u][i]$ là \textit{rating} mà người dùng $u$
+dành cho sản phẩm $i$. Các ô chưa có giá trị (NaN) là những \textit{rating} cần
+được dự đoán.
+
+CF được chia thành hai nhánh chính: \textbf{Memory-based CF} (dựa trên bộ nhớ, gồm
+\textit{User-based} và \textit{Item-based}) và \textbf{Model-based CF} (dựa trên mô
+hình, gồm \textit{Matrix Factorization} và các mô hình học sâu). Đồ án này triển
+khai cả ba phương pháp: \texttt{UserBasedCF}, \texttt{ItemBasedCF} và
+\texttt{MatrixFactorization}, được cài đặt hoàn toàn từ đầu bằng NumPy (không sử
+dụng thư viện CF chuyên dụng).
+
+\textbf{Vấn đề Cold Start:} CF gặp khó khăn khi người dùng mới hoặc sản phẩm mới
+chưa có đủ dữ liệu tương tác — không thể tính được \textit{similarity} vì vector
+\textit{rating} gần như rỗng. Trong hệ thống \textbf{CineRec}, trường hợp này được
+xử lý bằng cách \textit{fallback} về \textit{rating} trung bình của người dùng
+($\bar{r}_u$) khi không tìm được láng giềng hợp lệ (similarity~$> 0$).
+
+\subsection{User-based Collaborative Filtering}
+\label{section:2.2.2}
+
+\textit{User-based CF} tìm kiếm $K$ người dùng có sở thích tương đồng nhất với
+người dùng mục tiêu $u$ ($K$ \textit{nearest neighbors}), sau đó tổng hợp
+\textit{rating} của họ để dự đoán \textit{rating} cho sản phẩm $i$ chưa được đánh
+giá. Trong đồ án này, $K = 30$.
+
+Độ tương đồng giữa hai người dùng được đo bằng \textbf{mean-centered cosine
+similarity} — trừ \textit{rating} trung bình của từng người dùng để loại bỏ
+\textit{bias} đánh giá (xu hướng cho điểm cao hoặc thấp hơn trung bình):
+
+\begin{equation}
+    \text{sim}(u, v) = \frac{\displaystyle\sum_{i}
+        (r_{ui} - \bar{r}_u)(r_{vi} - \bar{r}_v)}
+        {\|r_u - \bar{r}_u\| \cdot \|r_v - \bar{r}_v\|}
+    \label{eq:user_sim}
+\end{equation}
+
+Công thức dự đoán \textit{rating} có hiệu chỉnh \textit{bias}:
+
+\begin{equation}
+    \hat{r}_{ui} = \bar{r}_u +
+        \frac{\displaystyle\sum_{v \in N(u)} \text{sim}(u,v)
+              \cdot (r_{vi} - \bar{r}_v)}
+             {\displaystyle\sum_{v \in N(u)} |\text{sim}(u,v)|}
+    \label{eq:user_pred}
+\end{equation}
+
+Trong đó $\bar{r}_u$ là \textit{rating} trung bình của user $u$, $N(u)$ là tập $K$
+láng giềng gần nhất của $u$ đã đánh giá sản phẩm $i$. Kết quả được giới hạn trong
+khoảng $[1, 5]$ bằng \texttt{np.clip}. Toàn bộ ma trận \textit{similarity}
+($943 \times 943$) được tính trước trong bước \texttt{fit()} bằng phép nhân ma trận
+NumPy ($R_n \cdot R_n^T$), đảm bảo hiệu năng khi phục vụ nhiều yêu cầu gợi ý.
+
+\subsection{Item-based Collaborative Filtering}
+\label{section:2.2.3}
+
+\textit{Item-based CF} tính độ tương đồng giữa các sản phẩm thay vì giữa người
+dùng~\cite{sarwar2001item}. Phương pháp sử dụng \textbf{adjusted cosine similarity}
+— trừ \textit{rating} trung bình của người dùng (không phải của sản phẩm) để loại
+bỏ \textit{bias} đánh giá cá nhân khi so sánh hai sản phẩm:
+
+\begin{equation}
+    \text{sim}(i, j) = \frac{\displaystyle\sum_{u}
+        (r_{ui} - \bar{r}_u)(r_{uj} - \bar{r}_u)}
+        {\|r_i - \bar{r}\| \cdot \|r_j - \bar{r}\|}
+    \label{eq:item_sim}
+\end{equation}
+
+Công thức dự đoán \textit{rating} cho user $u$ và item $i$, dựa trên $K = 30$ sản
+phẩm tương đồng nhất mà user $u$ đã đánh giá:
+
+\begin{equation}
+    \hat{r}_{ui} =
+        \frac{\displaystyle\sum_{j \in N(i,u)} \text{sim}(i,j) \cdot r_{uj}}
+             {\displaystyle\sum_{j \in N(i,u)} |\text{sim}(i,j)|}
+    \label{eq:item_pred}
+\end{equation}
+
+Công thức này sử dụng trực tiếp \textit{rating} thô $r_{uj}$ vì
+\textit{adjusted cosine similarity} đã hấp thụ \textit{bias} người dùng vào bước
+tính \textit{similarity}. Ma trận \textit{similarity} item ($1.682 \times 1.682$)
+cũng được tính trước trong \texttt{fit()} để phục vụ dự đoán \textit{online} nhanh.
+
+\textbf{Ưu điểm so với User-based CF:} Ma trận tương đồng item ổn định hơn theo thời
+gian (danh sách phim ít thay đổi hơn người dùng) và có thể tính toán
+\textit{offline}, phục vụ dự đoán \textit{online} nhanh hơn.
+
+% ─────────────────────────────────────────────────────────
+\section{Matrix Factorization}
+\label{section:2.3}
+
+\subsection{Ý tưởng cơ bản}
+\label{section:2.3.1}
+
+\textit{Matrix Factorization} (MF) là phương pháp thuộc nhóm \textit{Model-based CF},
+nổi bật qua cuộc thi Netflix Prize (2009)~\cite{koren2009matrix}. Ý tưởng cốt lõi là
+phân rã ma trận \textit{rating} $R$ ($n \times m$) thành tích của hai ma trận
+\textit{latent factor} có chiều thấp hơn:
+
+\begin{equation}
+    R \approx P \times Q^T
+    \label{eq:mf}
+\end{equation}
+
+Trong đó: $P$ ($n \times K$) là ma trận \textit{latent factor} của người dùng;
+$Q$ ($m \times K$) là ma trận \textit{latent factor} của sản phẩm; $K$ là số
+\textit{latent factors} (trong đồ án $K = 20$). \textit{Rating} được dự đoán bởi
+tích vô hướng $\hat{r}_{ui} = p_u \cdot q_i$.
+
+Các \textit{latent factor} không có nhãn tường minh, nhưng ngầm học các đặc trưng
+ẩn của dữ liệu — ví dụ: thể loại phim, phong cách đạo diễn, mức độ kịch tính.
+Người dùng và phim được ánh xạ vào cùng một không gian $K$ chiều, và
+\textit{rating} được ước lượng qua mức độ ``khớp'' giữa hai vector.
+
+Mô hình \textbf{Funk SVD}~\cite{funk2006netflix} mở rộng thêm \textit{bias} để tăng
+độ chính xác:
+
+\begin{equation}
+    \hat{r}_{ui} = \mu + b_u + b_i + p_u \cdot q_i
+    \label{eq:funk_svd}
+\end{equation}
+
+Trong đó $\mu$ là \textit{rating} trung bình toàn cục, $b_u$ là \textit{bias} của
+user $u$ (xu hướng cho điểm cao/thấp hơn trung bình), $b_i$ là \textit{bias} của
+item $i$ (phim được yêu thích hay không nói chung).
+
+\subsection{Hàm mất mát và Regularization}
+\label{section:2.3.2}
+
+Mô hình tối thiểu hóa hàm mất mát bình phương có thêm \textit{regularization} L2
+để tránh \textit{overfitting}:
+
+\begin{equation}
+    L = \sum_{(u,i) \in \text{rated}} (r_{ui} - \hat{r}_{ui})^2
+      + \lambda \cdot \bigl(\|p_u\|^2 + \|q_i\|^2 + b_u^2 + b_i^2\bigr)
+    \label{eq:loss}
+\end{equation}
+
+\textit{Regularization} với hệ số $\lambda = 0{,}02$ phạt các giá trị tham số quá
+lớn, giúp mô hình tổng quát hóa tốt hơn trên dữ liệu chưa thấy. Không có
+\textit{regularization}, mô hình dễ ghi nhớ tập \textit{train} mà không dự đoán
+được tập \textit{test}.
+
+\subsection{Stochastic Gradient Descent và theo dõi hội tụ}
+\label{section:2.3.3}
+
+Thuật toán \textit{Stochastic Gradient Descent} (SGD) cập nhật tham số sau mỗi
+\textit{rating} đơn lẻ (thay vì toàn bộ dataset như Batch GD), giúp hội tụ nhanh
+hơn~\cite{koren2009matrix}. Với \textit{residual}
+$e_{ui} = r_{ui} - \hat{r}_{ui}$ và \textit{learning rate} $\alpha = 0{,}005$,
+quy tắc cập nhật:
+
+\begin{align}
+    p_u &\leftarrow p_u + \alpha \cdot (e_{ui} \cdot q_i - \lambda \cdot p_u)
+        \label{eq:sgd_p} \\
+    q_i &\leftarrow q_i + \alpha \cdot (e_{ui} \cdot p_u - \lambda \cdot q_i)
+        \label{eq:sgd_q} \\
+    b_u &\leftarrow b_u + \alpha \cdot (e_{ui} - \lambda \cdot b_u)
+        \label{eq:sgd_bu} \\
+    b_i &\leftarrow b_i + \alpha \cdot (e_{ui} - \lambda \cdot b_i)
+        \label{eq:sgd_bi}
+\end{align}
+
+Dữ liệu được xáo trộn ngẫu nhiên (\texttt{np.random.shuffle}) đầu mỗi \textit{epoch}
+để tránh \textit{bias} thứ tự. Ma trận $P$ và $Q$ được khởi tạo từ phân phối chuẩn
+$\mathcal{N}(0,\, 0{,}1)$; \textit{bias} $b_u$, $b_i$ khởi tạo bằng $0$. Mô hình
+chạy $30$ \textit{epochs}. Sau mỗi \textit{epoch}, RMSE trên cả tập \textit{train}
+và tập \textit{validation} được ghi lại để theo dõi hội tụ và phát hiện
+\textit{overfitting}; hai đường \textit{loss curve} này được hiển thị trực quan
+trên giao diện web \textbf{CineRec}.
+
+% ─────────────────────────────────────────────────────────
+\section{Các chỉ số đánh giá}
+\label{section:2.4}
+
+\subsection{Chiến lược chia dữ liệu Train/Test}
+\label{section:2.4.1}
+
+Dữ liệu được chia theo chiến lược \textbf{temporal split}: với mỗi người dùng,
+$20\%$ \textit{rating} có \textit{timestamp} muộn nhất được giữ làm tập
+\textit{test}, $80\%$ còn lại làm tập \textit{train}. Chiến lược này phản ánh đúng
+kịch bản thực tế — mô hình chỉ học từ lịch sử quá khứ và dự đoán hành vi tương
+lai — tránh hiện tượng \textit{data leakage} mà \textit{random split} có thể gây ra
+(mô hình vô tình ``nhìn thấy tương lai'' khi huấn luyện).
+
+\subsection{MAE và RMSE}
+\label{section:2.4.2}
+
+Hai chỉ số đánh giá chất lượng dự đoán \textit{rating} trên tập
+\textit{test}~\cite{herlocker2004evaluating}:
+
+\begin{equation}
+    \text{MAE} = \frac{1}{n} \sum_{(u,i)} |r_{ui} - \hat{r}_{ui}|
+    \label{eq:mae}
+\end{equation}
+
+\begin{equation}
+    \text{RMSE} = \sqrt{\frac{1}{n} \sum_{(u,i)} (r_{ui} - \hat{r}_{ui})^2}
+    \label{eq:rmse}
+\end{equation}
+
+MAE đo sai số tuyệt đối trung bình, dễ hiểu và ít nhạy với \textit{outlier}.
+RMSE phạt nặng hơn các sai số lớn do bình phương hóa. Cả hai giá trị càng nhỏ,
+mô hình dự đoán càng chính xác.
+
+\subsection{Precision@K và Recall@K}
+\label{section:2.4.3}
+
+Hai chỉ số đánh giá chất lượng danh sách gợi ý Top-$K$, sử dụng ngưỡng
+\textit{rating} $\geq 4{,}0$ để xác định sản phẩm ``relevant''
+(khớp với tham số \texttt{threshold=4.0} trong hàm
+\texttt{precision\_recall\_at\_k()}):
+
+\begin{equation}
+    \text{Precision@}K =
+        \frac{|\{\text{relevant items}\} \cap \{\text{top-}K\text{ recs}\}|}{K}
+    \label{eq:precision}
+\end{equation}
+
+\begin{equation}
+    \text{Recall@}K =
+        \frac{|\{\text{relevant items}\} \cap \{\text{top-}K\text{ recs}\}|}
+             {|\{\text{relevant items}\}|}
+    \label{eq:recall}
+\end{equation}
+
+$\text{Precision@}K$ đo tỷ lệ gợi ý chính xác trong Top-$K$;
+$\text{Recall@}K$ đo tỷ lệ sản phẩm \textit{relevant} được tìm thấy trong Top-$K$.
+Hai chỉ số này bổ sung cho MAE/RMSE vì đánh giá trực tiếp chất lượng danh sách gợi
+ý thay vì độ chính xác từng \textit{rating} đơn lẻ. Do chi phí tính toán,
+$\text{Precision@10}$ và $\text{Recall@10}$ được tính trên \textit{subset} $200$
+người dùng đầu tiên của tập \textit{test}.
+
+% ─────────────────────────────────────────────────────────
+\section{Bộ dữ liệu MovieLens ml-100k}
+\label{section:2.5}
+
+\texttt{MovieLens ml-100k} là bộ dữ liệu chuẩn (\textit{benchmark}) được phát hành
+bởi nhóm GroupLens Research, Đại học Minnesota~\cite{harper2015movielens}. Đây là
+một trong những bộ dữ liệu được sử dụng rộng rãi nhất trong nghiên cứu hệ thống
+gợi ý nhờ kích thước vừa phải, chất lượng tốt và tính khả dụng công khai.
+
+\begin{table}[H]
+    \centering
+    \caption{Thống kê tổng quan dataset MovieLens ml-100k}
+    \label{tab:ml100k}
+    \begin{tabular}{lll}
+        \toprule
+        \textbf{Thuộc tính} & \textbf{Giá trị} & \textbf{Ghi chú} \\
+        \midrule
+        Số người dùng     & 943              & Đã ẩn danh \\
+        Số phim           & 1.682            & Nhiều thể loại \\
+        Tổng số rating    & 100.000          & Thang điểm 1--5 (nguyên) \\
+        Rating trung bình & 3,53             & Lệch về phía cao \\
+        Sparsity          & $\approx 93{,}70\%$
+                          & $1 - \dfrac{100.000}{943 \times 1.682}$,
+                            tính trên toàn bộ ma trận trước khi chia train/test \\
+        Thời gian         & 1997--1998       & Unix timestamp \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+Ma trận \textit{user-item} có độ thưa thớt cao ($\approx 93{,}70\%$), nghĩa là
+trung bình mỗi người dùng chỉ đánh giá khoảng $6{,}3\%$ số phim có trong hệ thống.
+Đây là thách thức điển hình của \textit{Collaborative Filtering}, đòi hỏi thuật
+toán phải xử lý tốt với dữ liệu \textit{sparse}.
+
+% ─────────────────────────────────────────────────────────
+\section{Công nghệ và phương pháp triển khai}
+\label{section:2.6}
+
+\subsection{Triển khai thuật toán}
+\label{section:2.6.1}
+
+Toàn bộ ba mô hình \textit{Collaborative Filtering} (User-based CF, Item-based CF,
+Matrix Factorization) được \textbf{triển khai hoàn toàn từ đầu} (\textit{from
+scratch}) bằng NumPy, không sử dụng thư viện học máy chuyên dụng như
+\texttt{Surprise}, \texttt{LightFM} hay các mô hình có sẵn của \texttt{scikit-learn}.
+Điều này đảm bảo:
+
+\begin{itemize}[itemsep=0.35em]
+    \item Hiểu sâu cơ chế hoạt động của từng thuật toán (công thức tính
+          \textit{similarity}, quy tắc dự đoán, cập nhật tham số SGD).
+    \item Kiểm soát hoàn toàn luồng xử lý dữ liệu, \textit{hyperparameter tuning}
+          và tối ưu hóa hiệu năng.
+    \item Tính toán ma trận tương đồng bằng phép nhân ma trận vectorized
+          (NumPy matrix multiplication), thay thế vòng lặp Python thuần, giảm thời
+          gian tính từ phút xuống giây.
+\end{itemize}
+
+\subsection{Stack công nghệ}
+\label{section:2.6.2}
+
+\begin{table}[H]
+    \centering
+    \caption{Các công nghệ sử dụng trong hệ thống CineRec}
+    \label{tab:tech}
+    \begin{tabular}{l l p{6.8cm}}
+        \toprule
+        \textbf{Công nghệ} & \textbf{Phiên bản} & \textbf{Mục đích sử dụng} \\
+        \midrule
+        \texttt{Python}       & 3.10+  & Ngôn ngữ lập trình chính \\
+        \texttt{NumPy}        & 1.24+  & \textbf{Lõi thuật toán}: Tính toán ma trận
+                                \textit{similarity}, phép nhân ma trận
+                                ($R_n \cdot R_n^T$), SGD cập nhật tham số
+                                $P$, $Q$, $b_u$, $b_i$ \\
+        \texttt{Pandas}       & 2.0+   & Đọc dữ liệu CSV, \textit{pivot table}
+                                (xây dựng ma trận $R$), \textit{temporal split},
+                                phân tích EDA \\
+        \texttt{Scikit-learn} & 1.3+   & \textbf{Chỉ dùng cho đánh giá}:
+                                \texttt{mean\_absolute\_error()},
+                                \texttt{mean\_squared\_error()} để tính
+                                MAE/RMSE. \textbf{Không} sử dụng cho xây
+                                dựng mô hình CF hay MF \\
+        \texttt{FastAPI}      & 0.110+ & Web framework backend RESTful API (endpoint
+                                \texttt{/api/recommend}, \texttt{/api/stats}) \\
+        \texttt{Uvicorn}      & 0.27+  & ASGI server chạy FastAPI (port 8000) \\
+        \texttt{HTML5/CSS3/JS} & ---   & Giao diện web frontend SPA
+                                (không dùng React/Vue, thuần Vanilla JS) \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+\textbf{Tóm tắt kiến trúc:}
+\begin{itemize}[itemsep=0.3em]
+    \item \textbf{Data Layer:} Pandas đọc \texttt{ratings.csv}, \texttt{movies.csv};
+          \texttt{temporal\_split()} chia train/test.
+    \item \textbf{Model Layer:} Ba lớp \texttt{UserBasedCF}, \texttt{ItemBasedCF},
+          \texttt{MatrixFactorization} cài đặt từ đầu bằng NumPy.
+    \item \textbf{API Layer:} FastAPI expose endpoint RESTful, trả JSON; Uvicorn
+          phục vụ HTTP.
+    \item \textbf{Presentation Layer:} HTML/CSS/JS render giao diện, gọi API qua
+          \texttt{fetch()}, vẽ biểu đồ \textit{loss curve} bằng Canvas API.
+\end{itemize}
+
+\end{document}

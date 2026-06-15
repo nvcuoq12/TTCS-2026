@@ -1,0 +1,60 @@
+\documentclass[../BTL.tex]{subfiles}
+\begin{document}
+\section{Đặt vấn đề}
+\label{section:1.1}
+Trong bối cảnh bùng nổ thông tin và sự phát triển mạnh mẽ của thương mại điện tử, người dùng ngày càng phải đối mặt với hiện tượng quá tải thông tin (\textit{information overload}). Với số lượng sản phẩm lớn, hàng chục nghìn bộ phim hay hàng tỷ bài hát được cung cấp trực tuyến, việc tìm kiếm nội dung phù hợp với sở hữu cá nhân trở nên phức tạp và tiêu tốn nhiều thời gian của người sử dụng.
+
+Hệ thống gợi ý (\textit{Recommendation System}) là giải pháp công nghệ hiệu quả cho vấn đề trên. Đây là một dạng hệ thống lọc thông tin có khả năng dự đoán sở thích, đánh giá hoặc hành vi của người dùng đối với một tập các sản phẩm hoặc dịch vụ, từ đó đề xuất những hạng mục phù hợp nhất. Việc tối ưu hóa cơ chế gợi ý giúp các nền tảng số gia tăng trải nghiệm người dùng, tối ưu hóa tỷ lệ giữ chân khách hàng và nâng cao hiệu quả kinh doanh. Hiện nay, hệ thống gợi ý đã đóng vai trò lõi tại những nền tảng lớn như Netflix, Amazon, Spotify và YouTube.
+
+Đồ án này tập trung nghiên cứu và triển khai một hệ thống gợi ý phim hoàn chỉnh — được đặt tên là \textbf{CineRec} — dựa trên kỹ thuật Lọc cộng tác (\textit{Collaborative Filtering}) và Phân rã ma trận (\textit{Matrix Factorization}), áp dụng trên bộ dữ liệu thực tế \texttt{MovieLens ml-100k} do nhóm GroupLens Research (Đại học Minnesota) cung cấp. Bộ dữ liệu này được lựa chọn dựa trên hai lý do cốt lõi:
+
+\begin{enumerate}
+    \item Đây là tập dữ liệu chuẩn (\textit{benchmark}) được cộng đồng nghiên cứu học thuật công nhận rộng rãi, cho phép đối chiếu kết quả thực nghiệm một cách khách quan với các công trình liên quan.
+    \item Với quy mô $100.000$ lượt đánh giá từ $943$ người dùng cho $1.682$ bộ phim, dữ liệu đủ lớn để kiểm chứng thuật toán một cách thực chất nhưng không gây quá tải tài nguyên hệ thống khi triển khai trên máy tính cá nhân — phù hợp với định hướng tự cài đặt thuật toán từ đầu của đề tài.
+\end{enumerate}
+
+\section{Mục tiêu đề tài}
+\label{section:1.2}
+\begin{description}[leftmargin=1.5em, itemsep=0.5em]
+    \item[\textbf{Mục tiêu lý thuyết:}] Nắm vững nền tảng lý thuyết của hệ thống gợi ý, đặc biệt là kỹ thuật \textit{Collaborative Filtering} và \textit{Matrix Factorization} (Funk SVD). Hiểu rõ các chỉ số đánh giá phổ biến: $MAE$, $RMSE$, $Precision@K$, $Recall@K$.
+    
+    \item[\textbf{Mục tiêu kỹ thuật:}] Triển khai thành công ba mô hình gợi ý (\textit{User-based CF}, \textit{Item-based CF}, \textit{Matrix Factorization} với SGD) bằng Python, tự cài đặt phần cốt lõi của thuật toán mà không sử dụng thư viện ML chuyên dụng như \texttt{Scikit-learn} hay \texttt{Surprise}. Các thư viện tính toán \texttt{NumPy} và \texttt{Pandas} vẫn được sử dụng để tối ưu hóa hiệu năng thông qua \textit{vectorization} (phép nhân ma trận, tính \textit{cosine similarity} hàng loạt), thay thế cho vòng lặp Python thuần túy vốn không phù hợp với ma trận kích thước $943 \times 1.682$.
+    
+    \item[\textbf{Mục tiêu thực nghiệm:}] Huấn luyện, đánh giá và so sánh hiệu suất các mô hình trên tập dữ liệu \texttt{ml-100k} theo chiến lược \textit{temporal split} ($80/20$). Thực hiện điều chỉnh siêu tham số để tối ưu kết quả, hướng đến đạt các chỉ số $MAE$ và $RMSE$ tương đương hoặc tiệm cận với kết quả tham chiếu của các nghiên cứu tiêu chuẩn trên cùng bộ dữ liệu. Bên cạnh đó, đánh giá chất lượng gợi ý thực tế qua $Precision@10$ và $Recall@10$.
+    
+    \item[\textbf{Mục tiêu ứng dụng:}] Xây dựng hệ thống demo hoàn chỉnh gồm backend \texttt{FastAPI} và frontend HTML5/CSS3/JavaScript thuần, cho phép người dùng nhập User ID ($1$–$943$), chọn phương pháp gợi ý và nhận danh sách Top-$N$ phim cùng lịch sử xem. Hệ thống đảm bảo thời gian phản hồi API (\textit{response time}) dưới $1$ giây sau khi khởi động, minh chứng khả năng ứng dụng thực tiễn.
+\end{description}
+
+\section{Phạm vi nghiên cứu}
+\label{section:1.3}
+Để giải quyết các nhiệm vụ xác định tại mục \ref{section:1.2}, đề tài đề xuất định hướng xây dựng và giới hạn bài toán theo các tiêu chí kỹ thuật cụ thể dưới đây:
+
+\begin{description}[leftmargin=1.5em, itemsep=0.8em]
+    \item[\textbf{Bài toán:}] Dự đoán điểm đánh giá (\textit{rating prediction}) và gợi ý Top-$N$ phim (\textit{item recommendation}). Hệ thống hỗ trợ cả hai chức năng: trả về điểm dự đoán (\textit{predicted rating}) và lịch sử xem của từng người dùng.
+    
+    \item[\textbf{Dữ liệu:}] Sử dụng bộ dữ liệu công khai \texttt{MovieLens ml-100k} (độ thưa thớt của ma trận khoảng $93,7\%$). Kích thước dữ liệu vừa đủ để kiểm chứng thuật toán từ đầu (\textit{from scratch}) trên máy tính cá nhân không cần GPU, đồng thời là \textit{benchmark} chuẩn trong nghiên cứu học thuật để so sánh kết quả. Đây là lý do \texttt{ml-100k} được ưu tiên so với các phiên bản lớn hơn như \texttt{ml-1m} hay \texttt{ml-20m}.
+    
+    \item[\textbf{Phương pháp:}] Tập trung vào ba mô hình chính bao gồm:
+    \begin{itemize}[itemsep=0.3em]
+        \item \textit{User-based CF} với \textit{Pearson/Cosine similarity} ($K=30$ láng giềng).
+        \item \textit{Item-based CF} với \textit{adjusted cosine similarity} ($K=30$).
+        \item \textit{Matrix Factorization} theo thuật toán Funk SVD tối ưu bằng SGD ($K=20$ nhân tố ẩn, $30$ \textit{epochs}).
+    \end{itemize}
+    Đề tài không đi sâu nghiên cứu kỹ thuật \textit{Content-based Filtering} hay Học sâu (\textit{Deep Learning}).
+    
+    \item[\textbf{Ngôn ngữ và công nghệ:}] Sử dụng ngôn ngữ Python 3.x; các thư viện \texttt{NumPy} và \texttt{Pandas} cho tính toán ma trận; \texttt{FastAPI} đảm nhiệm vai trò backend REST API; giao diện frontend được xây dựng bằng HTML5/CSS3/JavaScript thuần (không sử dụng framework). Hệ thống khởi động server thông qua \texttt{Uvicorn} và phục vụ giao diện web qua tệp \texttt{index.html}.
+    
+    \item[\textbf{Môi trường triển khai:}] Thực hiện hoàn toàn trên máy tính cá nhân, không yêu cầu GPU hay hạ tầng đám mây (\textit{cloud infrastructure}). Toàn bộ quá trình huấn luyện cả ba mô hình và khởi động hệ thống được hoàn thành chỉ trong vòng vài chục giây, chứng minh tính khả thi và hiệu quả của giải pháp trên các tài nguyên phần cứng thông thường.
+\end{description}
+\section{Bố cục  bài tập lớn}
+\label{section:1.4}Phần còn lại của báo cáo bài tập lớn này được tổ chức và cấu trúc chặt chẽ nhằm làm rõ toàn bộ quy trình nghiên cứu, triển khai hệ thống. 
+
+Tiếp sau phần mở đầu, Chương 2 sẽ tập trung làm sáng tỏ cơ sở lý thuyết nền tảng của hệ thống gợi ý, đi sâu vào bản chất toán học của kỹ thuật Lọc cộng tác (\textit{Collaborative Filtering}), phương pháp Phân rã ma trận (\textit{Matrix Factorization} với thuật toán Funk SVD), đồng thời định nghĩa chi tiết các chỉ số kiểm định sai số và chất lượng mô hình. 
+
+Trong Chương 3, tôi giới thiệu toàn bộ quy trình phân tích đặc trưng của bộ dữ liệu thực nghiệm \texttt{ml-100k}, từ đó phác thảo kiến trúc hệ thống tổng thể kết hợp giữa backend \texttt{FastAPI} và frontend trực quan, làm tiền đề cho chiến lược xây dựng ba mô hình cốt lõi. 
+
+Toàn bộ quá trình hiện thực hóa thuật toán từ đầu (\textit{from scratch}), kết quả thực nghiệm chi tiết theo các chỉ số $MAE$, $RMSE$, $Precision@10$, $Recall@10$ cũng như các đánh giá, so sánh định lượng và giao diện demo của hệ thống \textbf{CineRec} sẽ được trình bày cụ thể trong Chương 4. 
+
+Cuối cùng, Chương 5 đóng vai trò tổng kết lại toàn bộ các kết quả thực tiễn đã đạt được, thẳng thắn nhìn nhận những điểm hạn chế còn tồn tại và đề xuất định hướng phát triển khả thi trong tương lai.
+
+\end{document}

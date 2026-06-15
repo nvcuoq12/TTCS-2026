@@ -1,0 +1,8 @@
+.idea/.gitignore
+.idea/misc.xml
+.idea/modules.xml
+.idea/TTCS-2026.iml
+.idea/vcs.xml
+.idea/inspectionProfiles/profiles_settings.xml
+SourceCode/recsys_ml100k/__pycache__/app.cpython-314.pyc
+SourceCode/recsys_ml100k/__pycache__/models.cpython-314.pyc

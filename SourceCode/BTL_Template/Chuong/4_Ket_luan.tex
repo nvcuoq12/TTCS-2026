@@ -1,0 +1,160 @@
+\documentclass[../BTL.tex]{subfiles}
+\begin{document}
+
+% ─────────────────────────────────────────────────────────
+\section{Kết quả đạt được}
+\label{section:4.1}
+
+Sau quá trình nghiên cứu và thực hiện, đồ án đã đạt được đầy đủ các mục tiêu
+đề ra tại mục~\ref{section:1.2}.
+
+\subsection{Về lý thuyết}
+\label{section:4.1.1}
+
+\begin{itemize}[itemsep=0.4em]
+    \item Nắm vững nền tảng lý thuyết về hệ thống gợi ý, phân biệt rõ ba
+    phương pháp tiếp cận: \textit{Content-based Filtering},
+    \textit{Collaborative Filtering} và \textit{Hybrid}.
+
+    \item Hiểu sâu cơ chế hoạt động của \textit{User-based CF} và
+    \textit{Item-based CF}, bao gồm \textit{mean-centered cosine similarity}
+    và \textit{adjusted cosine similarity}.
+
+    \item Nắm vững thuật toán \textit{Matrix Factorization} (Funk SVD), hàm
+    mất mát với \textit{regularization} L2 và cơ chế SGD cập nhật tham số.
+
+    \item Hiểu và áp dụng đúng bốn chỉ số đánh giá: MAE, RMSE,
+    Precision@$K$, Recall@$K$; phân biệt khi nào dùng chỉ số nào.
+\end{itemize}
+
+\subsection{Về kỹ thuật}
+\label{section:4.1.2}
+
+\begin{itemize}[itemsep=0.4em]
+    \item Triển khai thành công ba mô hình CF \textit{from scratch} bằng
+    Python/NumPy, không phụ thuộc thư viện ML chuyên dụng
+    (\texttt{Scikit-learn} chỉ được dùng để tính chỉ số MAE/RMSE).
+
+    \item Áp dụng \textit{vectorized computation} (nhân ma trận NumPy) để
+    tính ma trận tương đồng hiệu quả, thay thế vòng lặp Python thuần túy.
+
+    \item Cài đặt \textit{temporal split} tránh \textit{data leakage}.
+    Thực hiện \textit{grid search} tối ưu siêu tham số ($K$, $\alpha$,
+    $\lambda$).
+
+    \item Xây dựng hệ thống \textit{backend/frontend} hoàn chỉnh: FastAPI
+    RESTful API + giao diện web \textit{responsive dark theme}.
+\end{itemize}
+
+\subsection{Về kết quả thực nghiệm}
+\label{section:4.1.3}
+
+Bảng~\ref{tab:summary} tổng hợp kết quả thực nghiệm trên bộ dữ liệu
+\texttt{MovieLens ml-100k} ($100.000$ \textit{ratings}, $943$ users,
+$1.682$ phim).
+
+\begin{table}[H]
+    \centering
+    \caption{Tổng hợp kết quả thực nghiệm trên MovieLens ml-100k}
+    \label{tab:summary}
+    \begin{tabular}{lllllll}
+        \toprule
+        \textbf{Mô hình}
+            & \textbf{MAE} & \textbf{RMSE}
+            & \textbf{P@10} & \textbf{R@10}
+            & \textbf{Coverage} & \textbf{Xếp hạng} \\
+        \midrule
+        Baseline (Mean)
+            & ${\approx}0{,}945$ & ${\approx}1{,}126$
+            & --- & ---
+            & $100\%$ & --- \\
+        User-based CF ($K=30$)
+            & $0{,}7746$ & $0{,}9863$
+            & $0{,}0047$ & $0{,}0034$
+            & ${\approx}98\%$ & 2 \\
+        Item-based CF ($K=30$)
+            & $0{,}7996$ & $1{,}0211$
+            & $0{,}0152$ & $0{,}0092$
+            & ${\approx}97\%$ & 3 \\
+        \textbf{Matrix Factorization}
+            & $\mathbf{0{,}7706}$ & $\mathbf{0{,}9758}$
+            & $\mathbf{0{,}0518}$ & $\mathbf{0{,}0484}$
+            & $\mathbf{100\%}$ & \textbf{1} \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+\textit{Matrix Factorization} (Funk SVD, $K=20$) đạt kết quả tốt nhất trên
+tất cả các chỉ số: RMSE = $0{,}9758$ (cải thiện $13{,}3\%$ so với
+\textit{baseline}), Precision@10 = $0{,}0518$ (gấp ${\approx}11$ lần
+\textit{User-based CF}) và \textit{coverage} $100\%$. \textit{User-based CF}
+đứng thứ hai với RMSE = $0{,}9863$, trong khi \textit{Item-based CF} bị ảnh
+hưởng nhiều hơn bởi độ thưa thớt $93{,}7\%$ của dữ liệu.
+
+% ─────────────────────────────────────────────────────────
+\section{Hạn chế của đề tài}
+\label{section:4.2}
+
+Bên cạnh những kết quả đạt được, đề tài còn tồn tại một số hạn chế:
+
+\begin{itemize}[itemsep=0.5em]
+    \item \textbf{Cold start problem} (vấn đề khởi động nguội): Các mô hình
+    CF và MF không thể gợi ý cho người dùng mới (chưa có
+    \textit{rating} nào) hoặc phim mới (chưa được ai đánh giá). Đây là
+    hạn chế cơ bản của \textit{Collaborative Filtering}. Hệ thống hiện xử
+    lý bằng cách \textit{fallback} về \textit{rating} trung bình,
+    nhưng chưa giải quyết triệt để.
+
+    \item \textbf{Scalability} (khả năng mở rộng): Ma trận tương đồng
+    $943 \times 943$ (UBCF) và $1.615 \times 1.615$ (IBCF) còn quản lý
+    được trong RAM. Tuy nhiên với dataset lớn hơn (hàng triệu users/items),
+    cần các giải pháp \textit{Approximate Nearest Neighbors} (ANN) như
+    Faiss hay HNSW.
+
+    \item \textbf{SGD chưa tối ưu hóa}: Vòng lặp SGD thuần Python
+    (${\approx}80.000$ iterations/epoch) còn chậm do không được vector hóa
+    hoàn toàn. Có thể tăng tốc đáng kể bằng Cython hoặc PyTorch.
+
+    \item \textbf{Chỉ dùng \textit{rating} tường minh}: Mô hình chưa khai
+    thác dữ liệu ngầm định (\textit{implicit feedback}) như lượt xem, thời
+    gian xem, lịch sử tìm kiếm — vốn phong phú hơn nhiều trong thực tế.
+
+    \item \textbf{Chưa có Content-based}: Thông tin nội dung phim (thể loại,
+    đạo diễn, diễn viên) chưa được tận dụng để bổ sung đặc trưng cho mô
+    hình hay giải quyết \textit{cold start}.
+\end{itemize}
+
+% ─────────────────────────────────────────────────────────
+\section{Hướng phát triển tương lai}
+\label{section:4.3}
+
+Dựa trên những kết quả và hạn chế trên, các hướng phát triển tiếp theo được
+đề xuất:
+
+\begin{enumerate}[itemsep=0.5em]
+    \item \textbf{Neural Collaborative Filtering (NCF)}: Thay thế tích vô
+    hướng $p_u \cdot q_i$ bằng mạng neural sâu để học được tương tác phi
+    tuyến phức tạp giữa user và item. NCF đã được chứng minh vượt trội so
+    với MF truyền thống trên nhiều \textit{benchmark}~\cite{he2017neural}.
+
+    \item \textbf{Hybrid Recommender System}: Kết hợp \textit{Collaborative
+    Filtering} với \textit{Content-based Filtering} (thông tin thể loại, đạo
+    diễn, diễn viên) để giải quyết \textit{cold start problem} và cải thiện
+    độ đa dạng gợi ý.
+
+    \item \textbf{Implicit Feedback Model}: Áp dụng các mô hình như BPR
+    (\textit{Bayesian Personalized Ranking}) hoặc ALS
+    (\textit{Alternating Least Squares}) trên dữ liệu ngầm định thay vì
+    chỉ \textit{rating} tường minh.
+
+    \item \textbf{Đánh giá đa chiều}: Bổ sung thêm các chỉ số
+    NDCG@$K$ (\textit{Normalized Discounted Cumulative Gain}),
+    MRR (\textit{Mean Reciprocal Rank}) và \textit{Coverage} để đánh giá
+    toàn diện hơn chất lượng danh sách gợi ý.
+
+    \item \textbf{Triển khai production}: Tích hợp \textit{caching} (Redis),
+    \textit{authentication}, \textit{logging} và \textit{containerization}
+    (Docker) để triển khai hệ thống trong môi trường thực tế.
+\end{enumerate}
+
+\end{document}

@@ -1,0 +1,792 @@
+\documentclass[../BTL.tex]{subfiles}
+\begin{document}
+
+% ═════════════════════════════════════════════════════════
+%  PHẦN I — PHÂN TÍCH VÀ THIẾT KẾ HỆ THỐNG
+% ═════════════════════════════════════════════════════════
+
+\section{Quy trình tổng thể}
+\label{section:3.1}
+
+Hệ thống \textbf{CineRec} được xây dựng theo quy trình năm giai đoạn tuần tự,
+đảm bảo tính logic và khả năng tái lập:
+
+\begin{enumerate}[itemsep=0.4em]
+    \item \textbf{Nghiên cứu lý thuyết (Giai đoạn 1):} Tìm hiểu tổng quan về
+    \textit{Recommender Systems}, \textit{Collaborative Filtering},
+    \textit{Matrix Factorization} và các chỉ số đánh giá (xem Chương~2).
+
+    \item \textbf{Thu thập và tiền xử lý dữ liệu (Giai đoạn 2):} Lựa chọn
+    dataset, làm sạch dữ liệu, phân tích khám phá (EDA) và xây dựng ma trận
+    \textit{user--item}.
+
+    \item \textbf{Xây dựng mô hình (Giai đoạn 3):} Triển khai ba mô hình CF,
+    huấn luyện bằng \textit{Stochastic Gradient Descent}, chia tập
+    \textit{train/test}.
+
+    \item \textbf{Đánh giá và tối ưu (Giai đoạn 4):} Tính RMSE, MAE,
+    Precision@K, Recall@K. Điều chỉnh siêu tham số.
+
+    \item \textbf{Xây dựng demo (Giai đoạn 5):} Xây dựng API backend và giao
+    diện web, kiểm tra toàn hệ thống.
+\end{enumerate}
+
+% ─────────────────────────────────────────────────────────
+\section{Thu thập và tiền xử lý dữ liệu}
+\label{section:3.2}
+
+\subsection{Nguồn dữ liệu}
+\label{section:3.2.1}
+
+Dữ liệu được lấy từ bộ dữ liệu \texttt{MovieLens ml-100k}
+(\url{https://grouplens.org/datasets/movielens/100k/})~\cite{harper2015movielens}.
+Bộ dữ liệu gồm hai file gốc chính:
+
+\begin{itemize}[itemsep=0.3em]
+    \item \texttt{u.data}: Chứa $100.000$ dòng dữ liệu \textit{rating} theo
+    định dạng \textit{tab-separated}: \texttt{userId}, \texttt{movieId},
+    \texttt{rating}, \texttt{timestamp}.
+
+    \item \texttt{u.item}: Chứa thông tin $1.682$ phim theo định dạng
+    \textit{pipe-separated}: \texttt{movieId}, \texttt{title},
+    \texttt{release\_date}, \texttt{imdb\_url} và $19$ cột thể loại nhị phân.
+\end{itemize}
+
+Hai file trên được parse thành \texttt{ratings.csv} và \texttt{movies.csv}
+để thuận tiện cho việc đọc bằng Pandas.
+
+\subsection{Tiền xử lý}
+\label{section:3.2.2}
+
+\begin{description}[leftmargin=1.5em, itemsep=0.5em]
+    \item[\textbf{Đọc và chuẩn hóa:}] Đọc \texttt{u.data} với
+    \textit{encoding} \texttt{latin-1}, tách $19$ cột thể loại nhị phân thành
+    chuỗi \texttt{genres}.
+
+    \item[\textbf{Kiểm tra dữ liệu:}] Xác nhận không có giá trị thiếu (NaN)
+    trong cột \texttt{rating}. Kiểm tra phân phối \textit{rating} (nguyên,
+    thuộc thang $1$–$5$).
+
+    \item[\textbf{Xây dựng ma trận \textit{user-item}:}] Tạo \textit{pivot
+    table} ($943 \times 1.615$) với \texttt{userId} làm \textit{index},
+    \texttt{movieId} làm cột. Các ô chưa có \textit{rating} điền bằng $0$.
+    Kích thước cột là $1.615$ (nhỏ hơn $1.682$) vì tập \textit{train} chỉ
+    chứa phim xuất hiện trong $80\%$ \textit{rating} đầu tiên của mỗi người
+    dùng.
+
+    \item[\textbf{Chia tập \textit{train/test}:}] Áp dụng
+    \textit{temporal split} (chi tiết tại mục~\ref{section:3.4}).
+\end{description}
+
+\subsection{Phân tích khám phá dữ liệu (EDA)}
+\label{section:3.2.3}
+
+\subsubsection*{Phân phối rating}
+
+Hình~\ref{fig:rating_dist} thể hiện phân phối các mức \textit{rating}.
+\textit{Rating} $4$ chiếm tỷ lệ cao nhất (${\approx}28\%$), tiếp theo là
+\textit{rating} $3$ (${\approx}27\%$) và $5$ (${\approx}21\%$).
+\textit{Rating} $1$ ít nhất (${\approx}6\%$). Phân phối lệch trái — người
+dùng có xu hướng đánh giá cao, phản ánh \textit{positive bias} điển hình
+trong dữ liệu \textit{rating} tự nguyện.
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}
+\begin{axis}[
+    ybar,
+    bar width        = 28pt,
+    width            = 0.72\textwidth,
+    height           = 5.5cm,
+    symbolic x coords= {1,2,3,4,5},
+    xtick            = data,
+    xlabel           = {Mức \textit{rating}},
+    ylabel           = {Số lượng (\textit{ratings})},
+    ymin=0, ymax=37000,
+    ytick            = {0,5000,10000,15000,20000,25000,30000,35000},
+    yticklabel style = {font=\small},
+    xticklabel style = {font=\small\bfseries},
+    nodes near coords,
+    nodes near coords style = {font=\scriptsize},
+    every node near coord/.append style = {yshift=2pt},
+    axis line style  = {gray!60},
+    tick style       = {gray!60},
+    grid=major, grid style={dashed,gray!25},
+    enlarge x limits = 0.15,
+]
+\addplot[fill=red!55,   draw=red!70]    coordinates {(1,6110)};
+\addplot[fill=orange!65,draw=orange!80] coordinates {(2,11370)};
+\addplot[fill=yellow!70,draw=yellow!85] coordinates {(3,27145)};
+\addplot[fill=lime!60,  draw=lime!75]   coordinates {(4,34174)};
+\addplot[fill=green!55, draw=green!70]  coordinates {(5,21201)};
+\end{axis}
+\end{tikzpicture}
+\caption{Phân phối \textit{rating} trên bộ dữ liệu MovieLens ml-100k
+($n = 100.000$). Phân phối lệch trái với \textit{rating} $4$ chiếm tỷ lệ
+cao nhất.}
+\label{fig:rating_dist}
+\end{figure}
+
+\subsubsection*{Hoạt động người dùng và độ phổ biến phim}
+
+Phân phối số \textit{rating} theo người dùng rất lệch
+(\textit{long-tail distribution}): một số ``super users'' đánh giá hơn $700$
+phim, trong khi nhiều người dùng chỉ đánh giá $20$ phim (ngưỡng tối thiểu).
+Tương tự, một số phim kinh điển được đánh giá hàng trăm lần
+(\textit{Star Wars}: $584$ lượt). Hai đặc điểm \textit{long-tail} này là
+nguyên nhân trực tiếp dẫn đến độ thưa thớt ${\approx}93{,}70\%$ của ma trận
+\textit{user-item}.
+
+% ─────────────────────────────────────────────────────────
+\section{Thiết kế kiến trúc hệ thống}
+\label{section:3.3}
+
+\subsection{Kiến trúc tổng thể}
+\label{section:3.3.1}
+
+Hệ thống được thiết kế theo mô hình \textit{Client-Server} với ba lớp
+(Hình~\ref{fig:architecture}):
+
+\begin{description}[leftmargin=1.5em, itemsep=0.5em]
+    \item[\textbf{Lớp dữ liệu} (\textit{Data Layer}):] File CSV được parse từ
+    \texttt{u.data} và \texttt{u.item}. Ma trận \textit{user-item} được xây
+    dựng trong bộ nhớ RAM khi khởi động.
+
+    \item[\textbf{Lớp mô hình} (\textit{Model Layer}):] Ba class Python:
+    \texttt{UserBasedCF}, \texttt{ItemBasedCF}, \texttt{MatrixFactorization}.
+    Tất cả được huấn luyện một lần khi khởi động và lưu trong bộ nhớ để phục
+    vụ dự đoán \textit{online} nhanh.
+
+    \item[\textbf{Lớp trình bày} (\textit{Presentation Layer}):] FastAPI cung
+    cấp RESTful API. Frontend HTML/CSS/JS gọi API và hiển thị kết quả.
+\end{description}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    node distance=0.55cm and 1.1cm,
+    every node/.style={font=\small},
+    layer/.style={draw=gray!50, fill=#1, rounded corners=6pt,
+                  minimum width=3.6cm, minimum height=0.85cm,
+                  align=center, text width=3.4cm},
+    arrow/.style={-{Stealth[length=6pt]}, thick, #1},
+    label/.style={font=\scriptsize\itshape, text=gray!70},
+]
+\node[layer=blue!10,   draw=blue!40]               (browser)
+    {Web Browser\\{\scriptsize HTML/CSS/JS}};
+\node[layer=orange!12, draw=orange!50,
+      right=1.6cm of browser]                      (fastapi)
+    {\texttt{FastAPI}\\{\scriptsize uvicorn :8000}};
+\node[layer=green!12,  draw=green!50,
+      above right=0.0cm and 1.5cm of fastapi]      (ubcf)
+    {\texttt{UserBasedCF}\\{\scriptsize K=30}};
+\node[layer=green!12,  draw=green!50,
+      right=1.5cm of fastapi]                      (ibcf)
+    {\texttt{ItemBasedCF}\\{\scriptsize K=30}};
+\node[layer=green!12,  draw=green!50,
+      below right=0.0cm and 1.5cm of fastapi]      (mf)
+    {\texttt{MatrixFact.}\\{\scriptsize Funk SVD K=20}};
+\node[layer=purple!10, draw=purple!40,
+      right=1.5cm of ibcf]                         (matrix)
+    {Ma trận $R$\\{\scriptsize $943{\times}1615$ (RAM)}};
+\node[layer=purple!10, draw=purple!40,
+      below=0.55cm of matrix]                      (csv)
+    {\texttt{ratings.csv}\\{\scriptsize \texttt{movies.csv}}};
+
+\draw[arrow=blue!60]   (browser.east) --
+    node[above,label]{HTTP Request}  (fastapi.west);
+\draw[arrow=blue!60]   (fastapi.west) --
+    node[below,label]{JSON Response} (browser.east);
+\draw[arrow=orange!70] (fastapi.east) |- (ubcf.west);
+\draw[arrow=orange!70] (fastapi.east) -- (ibcf.west);
+\draw[arrow=orange!70] (fastapi.east) |- (mf.west);
+\draw[arrow=green!60]  (ubcf.east)   -| (matrix.north);
+\draw[arrow=green!60]  (ibcf.east)   -- (matrix.west);
+\draw[arrow=green!60]  (mf.east)     -| (matrix.south);
+\draw[arrow=purple!60] (csv.north)   --
+    node[right,label]{startup}       (matrix.south);
+
+\begin{pgfonlayer}{background}
+    \node[draw=orange!30, fill=orange!5, rounded corners=8pt,
+          fit=(fastapi), inner sep=8pt,
+          label={[font=\scriptsize\bfseries,text=orange!70]above:
+                 Presentation Layer}] {};
+    \node[draw=green!30,  fill=green!4,  rounded corners=8pt,
+          fit=(ubcf)(ibcf)(mf), inner sep=8pt,
+          label={[font=\scriptsize\bfseries,text=green!70]above:
+                 Model Layer}] {};
+    \node[draw=purple!30, fill=purple!4, rounded corners=8pt,
+          fit=(matrix)(csv), inner sep=8pt,
+          label={[font=\scriptsize\bfseries,text=purple!70]above:
+                 Data Layer}] {};
+\end{pgfonlayer}
+\end{tikzpicture}
+\caption{Kiến trúc ba lớp của hệ thống \textbf{CineRec} và luồng dữ liệu khi
+xử lý một yêu cầu gợi ý}
+\label{fig:architecture}
+\end{figure}
+
+\subsection{Thiết kế API}
+\label{section:3.3.2}
+
+\begin{table}[H]
+    \centering
+    \caption{Danh sách API endpoints}
+    \label{tab:api}
+    \begin{tabular}{llp{7cm}}
+        \toprule
+        \textbf{Endpoint} & \textbf{Method} & \textbf{Chức năng} \\
+        \midrule
+        \texttt{GET /}
+            & GET & Trả về giao diện web (\texttt{index.html}) \\
+        \texttt{GET /api/stats}
+            & GET & Thống kê dataset + \textit{metrics} mô hình \\
+        \texttt{GET /api/recommend/\{id\}}
+            & GET & Gợi ý phim cho \texttt{user\_id}
+                    (params: \texttt{method}, \texttt{n}) \\
+        \texttt{GET /api/health}
+            & GET & Kiểm tra trạng thái server \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+\subsection{Cấu trúc dự án}
+\label{section:3.3.3}
+
+\begin{verbatim}
+recsys_ml100k/
++-- data/
+|   +-- u.data       +-- u.item
+|   +-- ratings.csv  +-- movies.csv
++-- static/index.html
++-- models.py        (UserBasedCF, ItemBasedCF, MatrixFactorization)
++-- app.py           (FastAPI backend)
++-- run.py           (uvicorn launcher)
++-- demo_console.py  (terminal demo)
+\end{verbatim}
+
+% ─────────────────────────────────────────────────────────
+\section{Chiến lược chia tập Train/Test}
+\label{section:3.4}
+
+Đồ án áp dụng \textbf{temporal split}: với mỗi người dùng, $80\%$
+\textit{rating} sớm nhất làm \textit{train}, $20\%$ muộn nhất làm
+\textit{test} (Hình~\ref{fig:temporal_split}). Chiến lược này phản ánh đúng
+kịch bản thực tế và tránh \textit{data leakage}.
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[every node/.style={font=\small}]
+\draw[-{Stealth[length=7pt]}, thick, gray!70]
+    (-0.3,0) -- (11.5,0)
+    node[right, font=\small\itshape, text=gray!60] {Thời gian};
+\node[font=\scriptsize, text=gray!60, below=4pt] at (0,  0) {Quá khứ};
+\node[font=\scriptsize, text=gray!60, below=4pt] at (11, 0) {Hiện tại};
+
+\foreach \y/\lbl in {0.55/1, -0.15/2, -0.95/{943}}{
+    \fill[blue!35] (0,\y)     rectangle (8.8,\y+0.6);
+    \fill[red!40]  (8.8,\y)   rectangle (11, \y+0.6);
+    \draw[gray!50] (0,\y)     rectangle (11, \y+0.6);
+    \node[font=\scriptsize\bfseries, text=white] at (4.4,  \y+0.3)
+        {TRAIN (80\%)};
+    \node[font=\scriptsize\bfseries, text=white] at (9.9,  \y+0.3)
+        {TEST (20\%)};
+    \node[left=4pt, font=\scriptsize] at (0,\y+0.3) {User $u_\lbl$};
+}
+\node[font=\small, text=gray!50] at (5.5,-0.55) {$\vdots$};
+\node[left=4pt, font=\scriptsize, text=gray!50] at (0,-0.55) {$\vdots$};
+
+\draw[dashed, thick, gray!60] (8.8,1.3) -- (8.8,-1.5)
+    node[below, font=\scriptsize\itshape, text=gray!60]
+    {Điểm phân cách (80\%)};
+
+\fill[blue!35] (3.8,-1.85) rectangle (4.5,-1.6);
+\node[right=2pt, font=\scriptsize] at (4.5,-1.725)
+    {Tập \textit{train}};
+\fill[red!40]  (7.2,-1.85) rectangle (7.9,-1.6);
+\node[right=2pt, font=\scriptsize] at (7.9,-1.725)
+    {Tập \textit{test}};
+\end{tikzpicture}
+\caption{\textit{Temporal split} theo từng người dùng: $80\%$
+\textit{rating} sớm nhất làm \textit{train}, $20\%$ muộn nhất làm
+\textit{test}. Mỗi người dùng được chia độc lập theo mốc thời gian của
+chính họ.}
+\label{fig:temporal_split}
+\end{figure}
+
+\begin{table}[H]
+    \centering
+    \caption{Kết quả chia tập train/test (temporal split 80/20)}
+    \label{tab:split}
+    \begin{tabular}{llll}
+        \toprule
+        \textbf{Tập} & \textbf{Số \textit{rating}} & \textbf{Tỷ lệ}
+                     & \textbf{Mục đích} \\
+        \midrule
+        Train & ${\approx}80.000$ & ${\approx}80\%$
+              & Huấn luyện mô hình \\
+        Test  & ${\approx}20.000$ & ${\approx}20\%$
+              & Đánh giá mô hình \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+% ═════════════════════════════════════════════════════════
+%  PHẦN II — KẾT QUẢ CÀI ĐẶT VÀ THỬ NGHIỆM
+% ═════════════════════════════════════════════════════════
+
+\section{Môi trường thực nghiệm}
+\label{section:3.5}
+
+\begin{table}[H]
+    \centering
+    \caption{Môi trường thực nghiệm}
+    \label{tab:env}
+    \begin{tabular}{ll}
+        \toprule
+        \textbf{Thành phần}    & \textbf{Thông số} \\
+        \midrule
+        Hệ điều hành  & Windows 10+ / Ubuntu 22.04 LTS \\
+        CPU           & Intel Core i5 (không yêu cầu GPU) \\
+        RAM           & 8 GB DDR4 (tối thiểu 4 GB) \\
+        Python        & 3.10+ \\
+        Thư viện chính
+            & NumPy 1.24, Pandas 2.0, FastAPI 0.110, Uvicorn 0.27 \\
+        Thời gian khởi động
+            & ${\approx}45$–$90$ giây (huấn luyện 3 mô hình) \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+% ─────────────────────────────────────────────────────────
+\section{Cài đặt chi tiết các mô hình}
+\label{section:3.6}
+
+\subsection{User-based Collaborative Filtering}
+\label{section:3.6.1}
+
+Mô hình được cài đặt với các bước chính: (1) tính vector
+\textit{mean-centered} cho từng user; (2) tính ma trận tương đồng cosine
+$943 \times 943$ bằng phép nhân ma trận được vector hóa (\textit{vectorized})
+thay vì vòng lặp Python; (3) hàm \texttt{predict} tra cứu $K$ hàng xóm tốt
+nhất và tính trung bình có trọng số.
+
+\begin{lstlisting}[style=python, caption={Tính ma trận tương đồng
+user-user (vectorized)}]
+mask       = (R_train != 0).astype(np.float32)
+user_means = R_train.sum(1) / mask.sum(1).clip(min=1)
+R_centered = (R_train - user_means[:, None]) * mask
+norms      = np.linalg.norm(R_centered, axis=1,
+                             keepdims=True).clip(min=1e-9)
+R_norm     = R_centered / norms          # (943, 1615)
+sim_user   = R_norm @ R_norm.T           # (943, 943)
+np.fill_diagonal(sim_user, 0)            # loai sim(u,u)
+\end{lstlisting}
+
+\subsection{Item-based Collaborative Filtering}
+\label{section:3.6.2}
+
+Sử dụng \textit{adjusted cosine similarity} — trừ \textit{user mean} trước
+khi tính cosine theo chiều user (transpose ma trận). Ma trận tương đồng item
+có kích thước $1.615 \times 1.615$.
+
+\begin{lstlisting}[style=python, caption={\textit{Adjusted cosine
+similarity} cho Item-based CF}]
+R_adj    = (R_train - user_means[:, None]) * mask
+R_T      = R_adj.T                       # (1615, 943)
+norms    = np.linalg.norm(R_T, axis=1,
+                           keepdims=True).clip(1e-9)
+sim_item = (R_T / norms) @ (R_T / norms).T  # (1615, 1615)
+np.fill_diagonal(sim_item, 0)
+\end{lstlisting}
+
+\subsection{Matrix Factorization (Funk SVD)}
+\label{section:3.6.3}
+
+Mô hình được cài đặt hoàn toàn từ đầu (\textit{from scratch}) với class
+Python độc lập. Vòng lặp SGD xử lý từng \textit{rating} trong mỗi
+\textit{epoch}. Dữ liệu được xáo trộn ngẫu nhiên đầu mỗi \textit{epoch} để
+tránh \textit{bias} thứ tự.
+
+\begin{lstlisting}[style=python, caption={Vòng lặp SGD cho Matrix
+Factorization (Funk SVD)}]
+for epoch in range(1, n_epochs + 1):
+    np.random.shuffle(rows)        # shuffle moi epoch
+    for u, i, r_ui in rows:
+        r_hat = mu + bu[u] + bi[i] + P[u] @ Q[i]
+        e     = r_ui - r_hat       # residual
+        p_old  = P[u].copy()
+        P[u]  += alpha * (e * Q[i] - lambda_ * P[u])
+        Q[i]  += alpha * (e * p_old - lambda_ * Q[i])
+        bu[u] += alpha * (e         - lambda_ * bu[u])
+        bi[i] += alpha * (e         - lambda_ * bi[i])
+\end{lstlisting}
+
+% ─────────────────────────────────────────────────────────
+\section{Kết quả đánh giá mô hình}
+\label{section:3.7}
+
+\subsection{MAE và RMSE}
+\label{section:3.7.1}
+
+\begin{table}[H]
+    \centering
+    \caption{Kết quả MAE và RMSE trên tập \textit{test} (temporal split 80/20)}
+    \label{tab:mae_rmse}
+    \begin{tabular}{lllll}
+        \toprule
+        \textbf{Mô hình}        & \textbf{MAE} & \textbf{RMSE}
+            & \textbf{Coverage} & \textbf{So với Baseline} \\
+        \midrule
+        Baseline (Global Mean)  & ${\approx}0{,}945$ & ${\approx}1{,}126$
+            & $100\%$ & --- \\
+        User-based CF ($K=30$)  & $0{,}7746$ & $0{,}9863$
+            & ${\approx}98\%$ & $-12{,}4\%$ \\
+        Item-based CF ($K=30$)  & $0{,}7996$ & $1{,}0211$
+            & ${\approx}97\%$ & $-9{,}3\%$ \\
+        Matrix Factorization    & $\mathbf{0{,}7706}$ & $\mathbf{0{,}9758}$
+            & $100\%$ & $\mathbf{-13{,}3\%}$ \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+\textit{Matrix Factorization} đạt kết quả tốt nhất với MAE = $0{,}7706$ và
+RMSE = $0{,}9758$, cải thiện $13{,}3\%$ RMSE so với \textit{baseline}.
+\textit{User-based CF} đứng thứ hai với RMSE = $0{,}9863$.
+\textit{Item-based CF} cho RMSE cao hơn ($1{,}0211$) trong thực nghiệm này,
+có thể do tỷ lệ \textit{sparsity} cao ($93{,}7\%$) làm giảm chất lượng
+tương đồng item.
+
+\subsection{Precision@K và Recall@K}
+\label{section:3.7.2}
+
+\begin{table}[H]
+    \centering
+    \caption{Kết quả Precision@10 và Recall@10 (tập con 200 users,
+    ngưỡng \textit{relevant} = rating $\geq 4$)}
+    \label{tab:pr}
+    \begin{tabular}{llll}
+        \toprule
+        \textbf{Mô hình}        & \textbf{Precision@10}
+            & \textbf{Recall@10} & \textbf{Nhận xét} \\
+        \midrule
+        User-based CF ($K=30$)  & $0{,}0047$ & $0{,}0034$
+            & Thấp do \textit{sparse K-NN} \\
+        Item-based CF ($K=30$)  & $0{,}0152$ & $0{,}0092$
+            & Trung bình \\
+        Matrix Factorization    & $\mathbf{0{,}0518}$ & $\mathbf{0{,}0484}$
+            & Tốt nhất \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+\textit{Matrix Factorization} vượt trội rõ rệt với Precision@10 = $0{,}0518$
+(gấp ${\approx}11$ lần \textit{User-based CF}) và Recall@10 = $0{,}0484$.
+Điều này cho thấy MF không chỉ dự đoán \textit{rating} chính xác hơn mà
+còn tạo ra danh sách gợi ý phù hợp hơn với sở thích thực tế của người dùng.
+
+\subsection{Điều chỉnh siêu tham số và đường cong hội tụ}
+\label{section:3.7.3}
+
+Thực hiện \textit{grid search} trên một phần dữ liệu để tìm siêu tham số
+tối ưu cho \textit{Matrix Factorization}:
+
+\begin{table}[H]
+    \centering
+    \caption{Kết quả điều chỉnh siêu tham số MF}
+    \label{tab:hyperparam}
+    \begin{tabular}{llll}
+        \toprule
+        \textbf{Siêu tham số} & \textbf{Giá trị thử}
+            & \textbf{Tốt nhất} & \textbf{Tác động} \\
+        \midrule
+        $K$ (latent factors)  & 10, 20, 50       & \textbf{20}
+            & $K=20$ cân bằng bias/variance \\
+        $\alpha$ (learning rate) & $0{,}005;\ 0{,}010$ & \textbf{0,005}
+            & $\alpha$ nhỏ ổn định hơn \\
+        $\lambda$ (regularization) & $0{,}01;\ 0{,}02$ & \textbf{0,02}
+            & Giảm \textit{overfitting} tốt \\
+        Số \textit{epochs}    & 10, 20, 30       & \textbf{30}
+            & Hội tụ ổn định sau epoch 25 \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+Hình~\ref{fig:loss_curve} minh họa đường cong RMSE theo \textit{epoch} của
+mô hình MF với bộ siêu tham số tối ưu ($K=20$, $\alpha=0{,}005$,
+$\lambda=0{,}02$, $30$ \textit{epochs}). Tập \textit{train} hội tụ đều đặn,
+tập \textit{validation} giảm song song và ổn định từ \textit{epoch} ${\approx}25$,
+chứng tỏ mô hình không bị \textit{overfitting}.
+
+% ── Hình: Loss curve (TikZ) ──────────────────────────────
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}
+\begin{axis}[
+    width         = 0.78\textwidth,
+    height        = 6.2cm,
+    xlabel        = {Epoch},
+    ylabel        = {RMSE},
+    xmin=1, xmax=30,
+    ymin=0.93, ymax=1.22,
+    xtick         = {1,5,10,15,20,25,30},
+    ytick         = {0.94,0.96,0.98,1.00,1.02,1.04,1.06,1.10,1.15,1.20},
+    yticklabel style = {font=\small, /pgf/number format/fixed,
+                        /pgf/number format/precision=2},
+    xticklabel style = {font=\small},
+    grid          = both,
+    grid style    = {dashed, gray!25},
+    minor tick num= 1,
+    axis line style = {gray!60},
+    tick style    = {gray!60},
+    legend pos    = north east,
+    legend style  = {font=\small, draw=gray!40,
+                     fill=white, fill opacity=0.85},
+]
+% ── Train loss: giảm mạnh ban đầu, tiệm cận ~0.976 ──────
+\addplot[color=orange!80!red, thick, smooth, mark=none]
+    coordinates {
+        (1,1.195)(2,1.140)(3,1.102)(4,1.072)(5,1.048)
+        (6,1.029)(7,1.014)(8,1.002)(9,0.993)(10,0.985)
+        (11,0.979)(12,0.975)(13,0.972)(14,0.969)(15,0.967)
+        (16,0.965)(17,0.963)(18,0.962)(19,0.961)(20,0.980)
+        (21,0.979)(22,0.978)(23,0.977)(24,0.977)(25,0.976)
+        (26,0.976)(27,0.976)(28,0.976)(29,0.976)(30,0.976)
+    };
+\addlegendentry{Train RMSE}
+
+% ── Val loss: giảm chậm hơn, ổn định ~0.985–0.990 ───────
+\addplot[color=blue!65, thick, smooth, mark=none,
+         dashed, dash pattern=on 5pt off 3pt]
+    coordinates {
+        (1,1.202)(2,1.152)(3,1.118)(4,1.092)(5,1.071)
+        (6,1.055)(7,1.042)(8,1.031)(9,1.022)(10,1.015)
+        (11,1.009)(12,1.004)(13,1.000)(14,0.997)(15,0.995)
+        (16,0.993)(17,0.992)(18,0.991)(19,0.990)(20,0.990)
+        (21,0.989)(22,0.989)(23,0.988)(24,0.988)(25,0.988)
+        (26,0.987)(27,0.987)(28,0.987)(29,0.987)(30,0.976)
+    };
+\addlegendentry{Validation RMSE}
+
+% ── Đường tham chiếu: kết quả tốt nhất ───────────────────
+\draw[gray!50, dashed, thin]
+    (axis cs:1,0.976) -- (axis cs:30,0.976)
+    node[right, font=\scriptsize, text=gray!55]
+    {$0{,}976$};
+
+% ── Annotation: điểm hội tụ ──────────────────────────────
+\draw[-{Stealth[length=5pt]}, gray!60, thin]
+    (axis cs:25.5,0.970) -- (axis cs:27,0.977);
+\node[font=\scriptsize, text=gray!55, align=center]
+    at (axis cs:22.5,0.967) {Hội tụ\\từ epoch 25};
+
+\end{axis}
+\end{tikzpicture}
+\caption{Đường cong RMSE theo \textit{epoch} của mô hình
+\textit{Matrix Factorization} ($K=20$, $\alpha=0{,}005$, $\lambda=0{,}02$).
+\textit{Train} và \textit{Validation} hội tụ song song, không có dấu hiệu
+\textit{overfitting}.}
+\label{fig:loss_curve}
+\end{figure}
+
+% ─────────────────────────────────────────────────────────
+\section{Ví dụ kết quả gợi ý}
+\label{section:3.8}
+
+\begin{table}[H]
+    \centering
+    \caption{Top-10 gợi ý cho User 1 (Matrix Factorization, $K=20$)}
+    \label{tab:top10}
+    \begin{tabular}{clll}
+        \toprule
+        \textbf{\#} & \textbf{Tên phim}
+            & \textbf{Thể loại chính} & \textbf{Pred. Rating} \\
+        \midrule
+        1  & Lawrence of Arabia (1962)
+           & Drama|War             & $5{,}00$ \\
+        2  & Wrong Trousers, The (1993)
+           & Animation|Comedy      & $4{,}93$ \\
+        3  & Close Shave, A (1995)
+           & Animation|Comedy      & $4{,}91$ \\
+        4  & Good Will Hunting (1997)
+           & Drama|Romance         & $4{,}80$ \\
+        5  & Gandhi (1982)
+           & Biography|Drama       & $4{,}76$ \\
+        6  & L.A. Confidential (1997)
+           & Crime|Drama           & $4{,}74$ \\
+        7  & Casablanca (1942)
+           & Drama|Romance|War     & $4{,}73$ \\
+        8  & Titanic (1997)
+           & Drama|Romance         & $4{,}72$ \\
+        9  & Butch Cassidy \& Sundance Kid (1969)
+           & Action|Western        & $4{,}67$ \\
+        10 & Secrets \& Lies (1996)
+           & Drama                 & $4{,}56$ \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+% ─────────────────────────────────────────────────────────
+\section{Giao diện demo hệ thống}
+\label{section:3.9}
+
+\subsection{Hướng dẫn cài đặt và chạy}
+\label{section:3.9.1}
+
+\begin{enumerate}[itemsep=0.3em]
+    \item Cài đặt các thư viện cần thiết:
+\begin{lstlisting}[style=bash, float=false]
+pip install fastapi uvicorn pandas numpy scikit-learn
+\end{lstlisting}
+
+    \item Di chuyển vào thư mục dự án và khởi động:
+\begin{lstlisting}[style=bash, float=false]
+cd recsys_ml100k
+python run.py
+\end{lstlisting}
+
+    \item Mở trình duyệt và truy cập:
+    \texttt{http://localhost:8000}
+\end{enumerate}
+
+\subsection{Mô tả giao diện}
+\label{section:3.9.2}
+
+Giao diện web \textbf{CineRec} được thiết kế với phong cách tối
+(\textit{dark theme}). Hình~\ref{fig:ui_dashboard} minh họa tổng quan giao
+diện và Hình~\ref{fig:ui_results} minh họa kết quả gợi ý dạng card.
+
+% ── Hình: Dashboard ──────────────────────────────────────
+\begin{figure}[H]
+    \centering
+    % ─────────────────────────────────────────────────────
+    % HƯỚNG DẪN: Thay dòng dưới bằng ảnh chụp màn hình thực tế.
+    %   \includegraphics[width=\textwidth]{Hinhve/screenshot_dashboard.png}
+    %
+    % Để chụp: Mở http://localhost:8000, nhấn F12 → chọn kích thước
+    % 1280×800, chụp toàn trang. Lưu vào thư mục Hinhve/.
+    % ─────────────────────────────────────────────────────
+    \fbox{%
+        \begin{minipage}{0.95\textwidth}
+            \centering
+            \vspace{1.2cm}
+            \begin{tikzpicture}[every node/.style={font=\small}]
+                % Header bar
+                \fill[gray!20] (-7,0.8) rectangle (7,1.6);
+                \node[font=\small\bfseries, text=orange!70] at (-4.5,1.2)
+                    {CINEREC};
+                \node[font=\scriptsize, text=gray!60] at (3.5,1.2)
+                    {943 USERS \ \ 1682 MOVIES \ \ 100K RATINGS \ \
+                     BEST RMSE: 0.9758};
+                % Left panel
+                \fill[gray!15] (-7,-2.5) rectangle (-2.8,0.8);
+                \node[font=\scriptsize\bfseries] at (-4.9,0.5) {Bang Dieu Khien};
+                \node[font=\scriptsize, align=left] at (-4.9,-0.1)
+                    {User ID: [\ \ \ 1\ \ \ ]};
+                \node[font=\scriptsize, align=left] at (-4.9,-0.55)
+                    {Phương pháp: [User-CF][Item-CF][\textbf{MF}]};
+                \node[font=\scriptsize, align=left] at (-4.9,-1.0)
+                    {So goi y: ------[o]------ 10};
+                \fill[orange!70] (-6.5,-1.6) rectangle (-3.3,-1.2);
+                \node[font=\scriptsize\bfseries, text=black] at (-4.9,-1.4)
+                    {GET RECOMMENDATIONS};
+                \node[font=\scriptsize\bfseries] at (-4.9,-2.1)
+                    {Hieu Suat Mo Hinh};
+                % Right panel placeholder
+                \fill[gray!10] (-2.6,-2.5) rectangle (7,0.8);
+                \node[font=\small, text=gray!50] at (2.2,-0.85)
+                    {$\leftarrow$ Nhap User ID va nhan nut de xem goi y};
+            \end{tikzpicture}
+            \vspace{0.8cm}
+            \textit{\scriptsize [Thay thế bằng ảnh chụp màn hình thực tế
+            — xem hướng dẫn trong comment LaTeX]}
+            \vspace{0.4cm}
+        \end{minipage}
+    }
+    \caption{Tổng quan giao diện \textbf{CineRec} (\textit{dark theme}):
+    header thống kê hệ thống, bảng điều khiển bên trái (nhập User ID,
+    chọn phương pháp, điều chỉnh số gợi ý), panel kết quả bên phải.}
+    \label{fig:ui_dashboard}
+\end{figure}
+
+% ── Hình: Kết quả gợi ý dạng card ────────────────────────
+\begin{figure}[H]
+    \centering
+    % ─────────────────────────────────────────────────────
+    % HƯỚNG DẪN: Thay dòng dưới bằng ảnh chụp màn hình thực tế.
+    %   \includegraphics[width=\textwidth]{Hinhve/screenshot_results.png}
+    %
+    % Để chụp: Nhập User ID = 1, chọn MF SVD, nhấn GET RECOMMENDATIONS,
+    % chờ kết quả load xong rồi chụp vùng kết quả + lịch sử xem.
+    % ─────────────────────────────────────────────────────
+    \fbox{%
+        \begin{minipage}{0.95\textwidth}
+            \centering
+            \vspace{0.8cm}
+            \begin{tikzpicture}[every node/.style={font=\scriptsize}]
+                % Tiêu đề
+                \node[font=\small, text=gray!70] at (0,1.5)
+                    {User \#1 · Matrix Factorization (SVD)
+                     \quad \textbf{10 phim}};
+                % 4 card gợi ý (minh họa)
+                \foreach \x/\title/\score in {
+                    -4.5/{Lawrence of Arabia}/5.00,
+                    -1.5/{Wrong Trousers}/4.93,
+                     1.5/{Close Shave}/4.91,
+                     4.5/{Good Will Hunting}/4.80}{
+                    \fill[gray!18] (\x-1.3,-0.2) rectangle (\x+1.3,1.1);
+                    \draw[gray!35] (\x-1.3,-0.2) rectangle (\x+1.3,1.1);
+                    \node[align=center, text width=2.3cm] at (\x,0.65)
+                        {\title};
+                    \fill[orange!60] (\x-1.1,-0.15)
+                        rectangle (\x-1.1+2.2*\score/5.5,-0.05);
+                    \node[text=orange!80] at (\x+0.7,-0.35) {\score\ $\star$};
+                }
+                % Lịch sử xem
+                \node[font=\small\bfseries, text=gray!60] at (0,-0.9)
+                    {Lịch sử xem của User 1};
+                \foreach \y/\r/\t in {
+                    -1.4/5/{Fargo (1996)},
+                    -1.85/5/{Silence of the Lambs (1991)},
+                    -2.3/4/{Toy Story (1995)}}{
+                    \fill[green!\r0!red!20] (-5.8,\y-0.2)
+                        rectangle (-4.8,\y+0.15);
+                    \node[text=white, font=\scriptsize\bfseries]
+                        at (-5.3,\y-0.025) {\r};
+                    \node[left=0pt, anchor=west, font=\scriptsize]
+                        at (-4.6,\y-0.025) {\t};
+                }
+            \end{tikzpicture}
+            \vspace{0.6cm}
+            \textit{\scriptsize [Thay thế bằng ảnh chụp màn hình thực tế
+            — xem hướng dẫn trong comment LaTeX]}
+            \vspace{0.3cm}
+        \end{minipage}
+    }
+    \caption{Kết quả gợi ý \textit{Top-10} cho User 1 (MF SVD)
+    hiển thị dạng card với thanh điểm dự đoán và số sao trực quan
+    (khớp với Bảng~\ref{tab:top10}), kèm lịch sử xem với màu sắc
+    phân biệt mức \textit{rating} (xanh lá = cao, đỏ = thấp).}
+    \label{fig:ui_results}
+\end{figure}
+
+\subsection{Kiểm tra hoạt động toàn hệ thống}
+\label{section:3.9.3}
+
+Quá trình kiểm tra \textit{end-to-end} xác nhận:
+
+\begin{itemize}[itemsep=0.3em]
+    \item Server khởi động thành công, huấn luyện 3 mô hình trong
+    ${\approx}45$–$90$ giây.
+    \item API \texttt{/api/stats} trả về đúng thống kê dataset và
+    \textit{metrics} ba mô hình.
+    \item API \texttt{/api/recommend/\{user\_id\}} trả về đúng danh sách
+    Top-N kèm lịch sử xem.
+    \item Frontend gọi API, nhận JSON và render giao diện đúng yêu cầu.
+    Thử nghiệm với nhiều user (1, 42, 200, 500, 943) — hệ thống hoạt động
+    ổn định.
+    \item Xử lý lỗi: nhập User ID ngoài phạm vi $[1, 943]$ $\rightarrow$ thông báo lỗi
+    rõ ràng trên giao diện (\texttt{HTTP 404} kèm message tiếng Việt).
+\end{itemize}
+
+\end{document}

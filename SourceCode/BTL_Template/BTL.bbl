@@ -1,0 +1,331 @@
+% $ biblatex auxiliary file $
+% $ biblatex bbl format version 3.3 $
+% Do not modify the above lines!
+%
+% This is an auxiliary file used by the 'biblatex' package.
+% This file may safely be deleted. It will be recreated as
+% required.
+%
+\begingroup
+\makeatletter
+\@ifundefined{ver@biblatex.sty}
+  {\@latex@error
+     {Missing 'biblatex' package}
+     {The bibliography requires the 'biblatex' package.}
+      \aftergroup\endinput}
+  {}
+\endgroup
+
+\datalist[entry]{none/global//global/global/global}
+  \entry{resnick1994grouplens}{inproceedings}{}{}
+    \name{author}{5}{}{%
+      {{hash=RP}{%
+         family={Resnick},
+         familyi={R\bibinitperiod},
+         given={Paul},
+         giveni={P\bibinitperiod},
+      }}%
+      {{hash=IN}{%
+         family={Iacovou},
+         familyi={I\bibinitperiod},
+         given={Neophytos},
+         giveni={N\bibinitperiod},
+      }}%
+      {{hash=SM}{%
+         family={Suchak},
+         familyi={S\bibinitperiod},
+         given={Mitesh},
+         giveni={M\bibinitperiod},
+      }}%
+      {{hash=BP}{%
+         family={Bergstrom},
+         familyi={B\bibinitperiod},
+         given={Peter},
+         giveni={P\bibinitperiod},
+      }}%
+      {{hash=RJ}{%
+         family={Riedl},
+         familyi={R\bibinitperiod},
+         given={John},
+         giveni={J\bibinitperiod},
+      }}%
+    }
+    \list{publisher}{1}{%
+      {ACM}%
+    }
+    \strng{namehash}{RP+1}
+    \strng{fullhash}{RPINSMBPRJ1}
+    \field{labelnamesource}{author}
+    \field{labeltitlesource}{title}
+    \field{booktitle}{Proceedings of the 1994 ACM Conference on Computer
+  Supported Cooperative Work (CSCW '94)}
+    \field{pages}{175\bibrangedash 186}
+    \field{title}{{GroupLens}: An open architecture for collaborative filtering
+  of netnews}
+    \field{year}{1994}
+  \endentry
+
+  \entry{ricci2011recommender}{book}{}{}
+    \name{author}{4}{}{%
+      {{hash=RF}{%
+         family={Ricci},
+         familyi={R\bibinitperiod},
+         given={Francesco},
+         giveni={F\bibinitperiod},
+      }}%
+      {{hash=RL}{%
+         family={Rokach},
+         familyi={R\bibinitperiod},
+         given={Lior},
+         giveni={L\bibinitperiod},
+      }}%
+      {{hash=SB}{%
+         family={Shapira},
+         familyi={S\bibinitperiod},
+         given={Bracha},
+         giveni={B\bibinitperiod},
+      }}%
+      {{hash=KPB}{%
+         family={Kantor},
+         familyi={K\bibinitperiod},
+         given={Paul\bibnamedelima B},
+         giveni={P\bibinitperiod\bibinitdelim B\bibinitperiod},
+      }}%
+    }
+    \list{publisher}{1}{%
+      {Springer}%
+    }
+    \strng{namehash}{RF+1}
+    \strng{fullhash}{RFRLSBKPB1}
+    \field{labelnamesource}{author}
+    \field{labeltitlesource}{title}
+    \field{title}{Recommender Systems Handbook}
+    \list{location}{1}{%
+      {New York}%
+    }
+    \field{year}{2011}
+  \endentry
+
+  \entry{sarwar2001item}{inproceedings}{}{}
+    \name{author}{4}{}{%
+      {{hash=SB}{%
+         family={Sarwar},
+         familyi={S\bibinitperiod},
+         given={Badrul},
+         giveni={B\bibinitperiod},
+      }}%
+      {{hash=KG}{%
+         family={Karypis},
+         familyi={K\bibinitperiod},
+         given={George},
+         giveni={G\bibinitperiod},
+      }}%
+      {{hash=KJ}{%
+         family={Konstan},
+         familyi={K\bibinitperiod},
+         given={Joseph},
+         giveni={J\bibinitperiod},
+      }}%
+      {{hash=RJ}{%
+         family={Riedl},
+         familyi={R\bibinitperiod},
+         given={John},
+         giveni={J\bibinitperiod},
+      }}%
+    }
+    \list{publisher}{1}{%
+      {ACM}%
+    }
+    \strng{namehash}{SB+1}
+    \strng{fullhash}{SBKGKJRJ1}
+    \field{labelnamesource}{author}
+    \field{labeltitlesource}{title}
+    \field{booktitle}{Proceedings of the 10th International Conference on World
+  Wide Web (WWW '01)}
+    \field{pages}{285\bibrangedash 295}
+    \field{title}{Item-based collaborative filtering recommendation algorithms}
+    \field{year}{2001}
+  \endentry
+
+  \entry{koren2009matrix}{article}{}{}
+    \name{author}{3}{}{%
+      {{hash=KY}{%
+         family={Koren},
+         familyi={K\bibinitperiod},
+         given={Yehuda},
+         giveni={Y\bibinitperiod},
+      }}%
+      {{hash=BR}{%
+         family={Bell},
+         familyi={B\bibinitperiod},
+         given={Robert},
+         giveni={R\bibinitperiod},
+      }}%
+      {{hash=VC}{%
+         family={Volinsky},
+         familyi={V\bibinitperiod},
+         given={Chris},
+         giveni={C\bibinitperiod},
+      }}%
+    }
+    \list{publisher}{1}{%
+      {IEEE}%
+    }
+    \strng{namehash}{KY+1}
+    \strng{fullhash}{KYBRVC1}
+    \field{labelnamesource}{author}
+    \field{labeltitlesource}{title}
+    \field{number}{8}
+    \field{pages}{30\bibrangedash 37}
+    \field{title}{Matrix factorization techniques for recommender systems}
+    \field{volume}{42}
+    \field{journaltitle}{Computer}
+    \field{year}{2009}
+  \endentry
+
+  \entry{funk2006netflix}{misc}{}{}
+    \name{author}{1}{}{%
+      {{hash=FS}{%
+         family={Funk},
+         familyi={F\bibinitperiod},
+         given={Simon},
+         giveni={S\bibinitperiod},
+      }}%
+    }
+    \strng{namehash}{FS1}
+    \strng{fullhash}{FS1}
+    \field{labelnamesource}{author}
+    \field{labeltitlesource}{title}
+    \field{note}{\url{https://sifter.org/~simon/journal/20061211.html} [Truy
+  cập: 15/06/2026]}
+    \field{title}{Netflix Update: Try This at Home}
+    \field{year}{2006}
+  \endentry
+
+  \entry{herlocker2004evaluating}{article}{}{}
+    \name{author}{4}{}{%
+      {{hash=HJL}{%
+         family={Herlocker},
+         familyi={H\bibinitperiod},
+         given={Jonathan\bibnamedelima L},
+         giveni={J\bibinitperiod\bibinitdelim L\bibinitperiod},
+      }}%
+      {{hash=KJA}{%
+         family={Konstan},
+         familyi={K\bibinitperiod},
+         given={Joseph\bibnamedelima A},
+         giveni={J\bibinitperiod\bibinitdelim A\bibinitperiod},
+      }}%
+      {{hash=TLG}{%
+         family={Terveen},
+         familyi={T\bibinitperiod},
+         given={Loren\bibnamedelima G},
+         giveni={L\bibinitperiod\bibinitdelim G\bibinitperiod},
+      }}%
+      {{hash=RJT}{%
+         family={Riedl},
+         familyi={R\bibinitperiod},
+         given={John\bibnamedelima T},
+         giveni={J\bibinitperiod\bibinitdelim T\bibinitperiod},
+      }}%
+    }
+    \list{publisher}{1}{%
+      {ACM}%
+    }
+    \strng{namehash}{HJL+1}
+    \strng{fullhash}{HJLKJATLGRJT1}
+    \field{labelnamesource}{author}
+    \field{labeltitlesource}{title}
+    \field{number}{1}
+    \field{pages}{5\bibrangedash 53}
+    \field{title}{Evaluating collaborative filtering recommender systems}
+    \field{volume}{22}
+    \field{journaltitle}{ACM Transactions on Information Systems (TOIS)}
+    \field{year}{2004}
+  \endentry
+
+  \entry{harper2015movielens}{article}{}{}
+    \name{author}{2}{}{%
+      {{hash=HFM}{%
+         family={Harper},
+         familyi={H\bibinitperiod},
+         given={F\bibnamedelima Maxwell},
+         giveni={F\bibinitperiod\bibinitdelim M\bibinitperiod},
+      }}%
+      {{hash=KJA}{%
+         family={Konstan},
+         familyi={K\bibinitperiod},
+         given={Joseph\bibnamedelima A},
+         giveni={J\bibinitperiod\bibinitdelim A\bibinitperiod},
+      }}%
+    }
+    \list{publisher}{1}{%
+      {ACM}%
+    }
+    \strng{namehash}{HFMKJA1}
+    \strng{fullhash}{HFMKJA1}
+    \field{labelnamesource}{author}
+    \field{labeltitlesource}{title}
+    \field{number}{4}
+    \field{pages}{1\bibrangedash 19}
+    \field{title}{The {MovieLens} datasets: History and context}
+    \field{volume}{5}
+    \field{journaltitle}{ACM Transactions on Interactive Intelligent Systems
+  (TiiS)}
+    \field{year}{2015}
+  \endentry
+
+  \entry{he2017neural}{inproceedings}{}{}
+    \name{author}{6}{}{%
+      {{hash=HX}{%
+         family={He},
+         familyi={H\bibinitperiod},
+         given={Xiangnan},
+         giveni={X\bibinitperiod},
+      }}%
+      {{hash=LL}{%
+         family={Liao},
+         familyi={L\bibinitperiod},
+         given={Lizi},
+         giveni={L\bibinitperiod},
+      }}%
+      {{hash=ZH}{%
+         family={Zhang},
+         familyi={Z\bibinitperiod},
+         given={Hanwang},
+         giveni={H\bibinitperiod},
+      }}%
+      {{hash=NL}{%
+         family={Nie},
+         familyi={N\bibinitperiod},
+         given={Liqiang},
+         giveni={L\bibinitperiod},
+      }}%
+      {{hash=HX}{%
+         family={Hu},
+         familyi={H\bibinitperiod},
+         given={Xia},
+         giveni={X\bibinitperiod},
+      }}%
+      {{hash=CTS}{%
+         family={Chua},
+         familyi={C\bibinitperiod},
+         given={Tat-Seng},
+         giveni={T\bibinithyphendelim S\bibinitperiod},
+      }}%
+    }
+    \list{publisher}{1}{%
+      {ACM}%
+    }
+    \strng{namehash}{HX+1}
+    \strng{fullhash}{HXLLZHNLHXCTS1}
+    \field{labelnamesource}{author}
+    \field{labeltitlesource}{title}
+    \field{booktitle}{Proceedings of the 26th International Conference on World
+  Wide Web (WWW '17)}
+    \field{pages}{173\bibrangedash 182}
+    \field{title}{Neural collaborative filtering}
+    \field{year}{2017}
+  \endentry
+\enddatalist
+\endinput

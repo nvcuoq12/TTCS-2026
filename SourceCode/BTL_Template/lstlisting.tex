@@ -1,0 +1,57 @@
+% lstlisting.tex — Cấu hình listings package cho Python, Bash
+% Được \input{} bởi BTL.tex (KHÔNG dùng \usepackage{listings} hay \usepackage{xcolor} ở đây
+% vì BTL.tex đã load chúng rồi — tránh duplicate)
+
+% ── Màu sắc ──────────────────────────────────────────────
+\definecolor{codebg}{RGB}{248,248,252}
+\definecolor{codecomment}{RGB}{100,100,160}
+\definecolor{codekeyword}{RGB}{0,100,180}
+\definecolor{codestring}{RGB}{160,40,40}
+\definecolor{codenumber}{RGB}{100,100,100}
+\definecolor{codeframe}{RGB}{200,200,220}
+
+% ── Style mặc định ───────────────────────────────────────
+\lstdefinestyle{defaultstyle}{
+    backgroundcolor   = \color{codebg},
+    commentstyle      = \color{codecomment}\itshape,
+    keywordstyle      = \color{codekeyword}\bfseries,
+    stringstyle       = \color{codestring},
+    numberstyle       = \tiny\color{codenumber},
+    basicstyle        = \ttfamily\footnotesize,
+    breakatwhitespace = false,
+    breaklines        = true,
+    captionpos        = b,
+    keepspaces        = true,
+    numbers           = left,
+    numbersep         = 8pt,
+    showspaces        = false,
+    showstringspaces  = false,
+    showtabs          = false,
+    tabsize           = 4,
+    frame             = single,
+    rulecolor         = \color{codeframe},
+    xleftmargin       = 15pt,
+    framexleftmargin  = 15pt,
+    inputencoding     = utf8,
+    extendedchars     = true,
+}
+
+% ── Python ───────────────────────────────────────────────
+\lstdefinestyle{python}{
+    style          = defaultstyle,
+    language       = Python,
+    morekeywords   = {True, False, None, self, cls,
+                      async, await, yield, lambda,
+                      import, from, as, pass, raise,
+                      with, assert, del, global, nonlocal},
+}
+
+% ── Bash / Shell ─────────────────────────────────────────
+\lstdefinestyle{bash}{
+    style          = defaultstyle,
+    language       = bash,
+    morekeywords   = {pip, python, uvicorn, cd},
+}
+
+% ── Style mặc định cho lstlisting không chỉ định language ─
+\lstset{style=defaultstyle}
