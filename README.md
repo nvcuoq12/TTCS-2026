@@ -1,6 +1,6 @@
 # CineRec — Hệ thống Gợi ý Phim trên MovieLens ml-100k
 
-Đồ án môn **Toán Tử Và Công Cụ Trong Công Nghệ Phần Mềm (TTCS)** — B23DCCN870  
+Đồ án môn **(TTCS)** — B23DCCN870  
 Triển khai ba mô hình Collaborative Filtering từ đầu (from scratch) và xây dựng demo web thời gian thực.
 
 ---
